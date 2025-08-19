@@ -1,0 +1,13 @@
+timestamp,session_id,event_type,engagement,music_style,note,details
+2024-01-15T09:00:00,20240115_090000,session_start,MED,,,"{""session_id"": ""20240115_090000""}"
+2024-01-15T09:00:15,20240115_090000,engagement_update,LOW,,,"{""session_id"": ""20240115_090000"", ""level"": ""LOW""}"
+2024-01-15T09:00:30,20240115_090000,gpt_suggestion,LOW,happy,,"{""session_id"": ""20240115_090000"", ""engagement"": ""LOW"", ""suggestion"": ""happy"", ""phrase"": ""Let's play some happy music!""}"
+2024-01-15T09:00:35,20240115_090000,caregiver_action,LOW,happy,,"{""session_id"": ""20240115_090000"", ""action"": ""accept"", ""note"": null, ""modified_style"": null}"
+2024-01-15T09:02:00,20240115_090000,engagement_update,MED,,,"{""session_id"": ""20240115_090000"", ""level"": ""MED""}"
+2024-01-15T09:02:15,20240115_090000,gpt_suggestion,MED,calm,,"{""session_id"": ""20240115_090000"", ""engagement"": ""MED"", ""suggestion"": ""calm"", ""phrase"": ""Time for peaceful sounds""}"
+2024-01-15T09:02:20,20240115_090000,caregiver_action,MED,calm,,"{""session_id"": ""20240115_090000"", ""action"": ""accept"", ""note"": null, ""modified_style"": null}"
+2024-01-15T09:04:00,20240115_090000,engagement_update,HIGH,,,"{""session_id"": ""20240115_090000"", ""level"": ""HIGH""}"
+2024-01-15T09:04:15,20240115_090000,gpt_suggestion,HIGH,calm,,"{""session_id"": ""20240115_090000"", ""engagement"": ""HIGH"", ""suggestion"": ""calm"", ""phrase"": ""Let's relax with quiet music""}"
+2024-01-15T09:04:20,20240115_090000,caregiver_action,HIGH,calm,,"{""session_id"": ""20240115_090000"", ""action"": ""modify"", ""note"": ""Too stimulating"", ""modified_style"": ""calm""}"
+2024-01-15T09:06:00,20240115_090000,engagement_update,MED,,,"{""session_id"": ""20240115_090000"", ""level"": ""MED""}"
+2024-01-15T09:08:00,20240115_090000,session_end,MED,,,"{""session_id"": ""20240115_090000"", ""total_suggestions"": 3}"
