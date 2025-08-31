@@ -1,0 +1,4 @@
+timestamp,session_id,event,note,engagement,music_style,suggestion,caregiver_action,child_response
+2025-08-18T20:44:29.721673,session_1755575040,accept,Session session_1755575040,HIGH,energetic,"Wow, you have so much energy! Let's move to this exciting beat!",accept,
+2025-08-18T20:44:40.437676,session_1755575040,response,Session session_1755575040,HIGH,energetic,"Wow, you have so much energy! Let's move to this exciting beat!",response,
+2025-08-18T20:44:41.260789,session_1755575040,response,Session session_1755575040,HIGH,energetic,"Wow, you have so much energy! Let's move to this exciting beat!",response,

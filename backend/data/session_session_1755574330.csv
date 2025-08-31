@@ -1,0 +1,4 @@
+timestamp,session_id,event,note,engagement,music_style,suggestion,caregiver_action,child_response
+2025-08-18T20:32:25.115612,session_1755574330,accept,Session session_1755574330,MED,happy,This happy tune makes me want to smile! Can you clap along?,accept,
+2025-08-18T20:32:33.611939,session_1755574330,accept,Session session_1755574330,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,accept,
+2025-08-18T20:32:38.094010,session_1755574330,skip,Session session_1755574330,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,skip,
