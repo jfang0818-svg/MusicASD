@@ -119,3 +119,4 @@ node_modules/
 zparked/
 debug_steps.txt
 devmaterials/
+.claude/
