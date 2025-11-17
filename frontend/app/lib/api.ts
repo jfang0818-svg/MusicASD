@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 
 // API Base URLs from environment variables
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/backend';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'http://localhost:3000/api/mcp';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
@@ -14,6 +14,22 @@ const apiClient = axios.create({
   },
   timeout: 30000,
 });
+
+// Request interceptor to add auth token
+apiClient.interceptors.request.use(
+  (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 const mcpClient = axios.create({
   baseURL: MCP_URL,
@@ -30,7 +46,18 @@ const handleApiError = (error: AxiosError) => {
                   'An unexpected error occurred';
 
   console.error('API Error:', error);
-  toast.error(message);
+
+  // Handle 401 (unauthorized) - redirect to login
+  if (error.response?.status === 401) {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+  } else {
+    toast.error(message);
+  }
+
   throw error;
 };
 
@@ -271,3 +298,104 @@ export class WebSocketClient {
 
 // Export a singleton WebSocket client instance
 export const wsClient = new WebSocketClient();
+
+// ==================== AUTH API ====================
+
+export async function registerUser(data: {
+  email: string;
+  password: string;
+  name: string;
+  phone?: string;
+}) {
+  const response = await apiClient.post('/auth/register', data);
+  return response.data;
+}
+
+export async function loginUser(data: { email: string; password: string }) {
+  const response = await apiClient.post('/auth/login', data);
+  return response.data;
+}
+
+export async function getCurrentUser() {
+  const response = await apiClient.get('/auth/me');
+  return response.data;
+}
+
+export function logout() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+}
+
+// ==================== PROFILE API ====================
+
+export async function createChildProfile(data: any) {
+  const response = await apiClient.post('/profile/child', data);
+  return response.data;
+}
+
+export async function getChildProfiles() {
+  const response = await apiClient.get('/profile/children');
+  return response.data;
+}
+
+export async function getChildProfile(childId: string) {
+  const response = await apiClient.get(`/profile/child/${childId}`);
+  return response.data;
+}
+
+export async function updateChildProfile(childId: string, data: any) {
+  const response = await apiClient.put(`/profile/child/${childId}`, data);
+  return response.data;
+}
+
+export async function deleteChildProfile(childId: string) {
+  const response = await apiClient.delete(`/profile/child/${childId}`);
+  return response.data;
+}
+
+export async function analyzeChildProfile(childId: string) {
+  const response = await apiClient.post(`/profile/child/${childId}/analyze`);
+  return response.data;
+}
+
+export async function getMusicElements(childId: string) {
+  const response = await apiClient.get(`/profile/child/${childId}/music-elements`);
+  return response.data;
+}
+
+// ==================== SESSION API (Updated) ====================
+
+export async function startSessionForChild(childId: string) {
+  const response = await apiClient.post('/session/start', { child_id: childId });
+  return response.data;
+}
+
+export async function stopSessionUpdated() {
+  const response = await apiClient.post('/session/stop');
+  return response.data;
+}
+
+export async function getChildSessions(childId: string) {
+  const response = await apiClient.get(`/session/child/${childId}/sessions`);
+  return response.data;
+}
+
+// ==================== ANALYTICS API ====================
+
+export async function getMusicEffectiveness(childId: string) {
+  const response = await apiClient.get(`/api/v1/analytics/music-effectiveness/${childId}`);
+  return response.data;
+}
+
+export async function getEngagementTrends(childId: string, days: number = 30) {
+  const response = await apiClient.get(`/api/v1/analytics/engagement-trends/${childId}?days=${days}`);
+  return response.data;
+}
+
+export async function getDashboardAnalytics() {
+  const response = await apiClient.get('/api/v1/analytics/dashboard');
+  return response.data;
+}

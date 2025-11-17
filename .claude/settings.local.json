@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" test_email.py)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" test_full_flow.py)",
+      "Bash(taskkill:*)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -m uvicorn:*)",
+      "Bash(ping:*)",
+      "Bash(netstat:*)",
+      "Bash(cmd //c taskkill //PID 6044 //F)",
+      "Bash(Default Browser)",
+      "Bash(Make Default)",
+      "Bash(npm run dev:*)",
+      "Bash(npm view:*)",
+      "Bash(copy package.json package.json.backup)",
+      "Bash(npm install:*)",
+      "Bash(npx @next/codemod@canary next-async-request-api .)",
+      "Bash(npx @next/codemod@canary next-async-request-api:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

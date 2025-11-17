@@ -126,10 +126,21 @@ def music_status():
 
 @router.get("/library")
 def get_music_library():
-    """Get available music files by style"""
+    """Get available music files by style (cached for 1 hour)"""
+    from services.redis_client import redis_client
     state = get_state()
 
-    # Rescan library to ensure it's up to date
+    CACHE_KEY = "music:library"
+    CACHE_TTL = 3600  # 1 hour
+
+    # Try to get from cache first
+    if redis_client.is_connected():
+        cached_library = redis_client.get_json(CACHE_KEY)
+        if cached_library:
+            logger.debug("Music library retrieved from cache")
+            return cached_library
+
+    # Cache miss - scan library
     state.scan_music_library()
 
     library_with_counts = {}
@@ -139,16 +150,24 @@ def get_music_library():
             "count": len(files)
         }
 
-    return {
+    response = {
         "library": state.music_library,
         "detailed": library_with_counts,
         "total_files": sum(len(files) for files in state.music_library.values()),
         "generated_count": len(state.generated_tones)
     }
 
+    # Cache the result
+    if redis_client.is_connected():
+        redis_client.set_json(CACHE_KEY, response, expire=CACHE_TTL)
+        logger.debug("Music library cached for 1 hour")
+
+    return response
+
 @router.post("/upload/{style}")
 async def upload_music(style: str, file: UploadFile = File(...)):
     """Upload new music file to library"""
+    from services.redis_client import redis_client
     state = get_state()
 
     if style not in ["calm", "happy", "energetic"]:
@@ -165,6 +184,11 @@ async def upload_music(style: str, file: UploadFile = File(...)):
 
         # Rescan library
         state.scan_music_library()
+
+        # Invalidate cache
+        if redis_client.is_connected():
+            redis_client.delete("music:library")
+            logger.debug("Music library cache invalidated after upload")
 
         logger.info(f"Uploaded {file.filename} to {style}")
         return {

@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
+
+  // Empty turbopack config to silence webpack warning
+  turbopack: {},
 
   // Backend API proxy configuration
   async rewrites() {

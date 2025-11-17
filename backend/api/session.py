@@ -1,20 +1,23 @@
 """
 Session API endpoints
 """
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
-import time
-import csv
-import sqlite3
-import os
 import logging
+from services.auth import auth_service, security
+from services.azure_storage import azure_storage
+from services.session_manager import get_session_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/session", tags=["session"])
 
 # Pydantic models
+class SessionStart(BaseModel):
+    child_id: str
+
 class SessionLog(BaseModel):
     event: str
     note: Optional[str] = ""
@@ -29,45 +32,68 @@ def get_state():
     return state
 
 @router.post("/start")
-def start_session():
-    """Start a new therapy session"""
-    state = get_state()
+async def start_session(
+    session_data: SessionStart,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Start a new therapy session for a specific child (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
 
-    # End previous session if active
-    if state.session_active:
-        logger.warning("Previous session was still active, ending it")
-        stop_session()
+    # Verify child profile exists and belongs to user
+    profile = await azure_storage.get_child_profile(user_id, session_data.child_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+    if profile["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    state.session_active = True
-    state.session_id = f"session_{int(time.time())}"
-    state.logs = []
+    # Create session using SessionManager (handles auto-ending previous sessions)
+    try:
+        session = await session_manager.create_session(
+            user_id=user_id,
+            child_id=session_data.child_id,
+            child_name=profile["demographics"]["name"]
+        )
 
-    # Create initial log entry
-    log_entry = {
-        "timestamp": datetime.now().isoformat(),
-        "session_id": state.session_id,
-        "event": "Session Started",
-        "engagement": state.engagement_level
-    }
-    state.logs.append(log_entry)
+        # Also update legacy global state for backwards compatibility
+        state = get_state()
+        state.session_active = True
+        state.session_id = session["id"]
+        state.child_id = session_data.child_id
+        state.user_id = user_id
+        state.logs = []
 
-    logger.info(f"Session started: {state.session_id}")
-    return {
-        "status": "started",
-        "session_id": state.session_id,
-        "timestamp": datetime.now().isoformat()
-    }
+        logger.info(f"Session started: {session['id']} for child {session_data.child_id}")
+
+        return {
+            "status": "started",
+            "session_id": session["id"],
+            "child_id": session["child_id"],
+            "child_name": session["child_name"],
+            "timestamp": session["timestamp"]
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to start session: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start session: {str(e)}")
 
 @router.post("/stop")
-def stop_session():
-    """Stop current therapy session"""
+async def stop_session(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Stop current therapy session (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
     state = get_state()
 
-    if not state.session_active:
+    # Get active session ID
+    active_session_id = session_manager.get_active_session(user_id)
+    if not active_session_id and not state.session_active:
         return {
             "status": "no_active_session",
             "message": "No session to stop"
         }
+
+    # Use session ID from SessionManager or fall back to state
+    session_id = active_session_id or state.session_id
 
     # Stop music if playing
     if state.music_playing:
@@ -79,31 +105,38 @@ def stop_session():
         except Exception as e:
             logger.error(f"Error stopping music: {e}")
 
-    # Add final log entry
-    log_entry = {
-        "timestamp": datetime.now().isoformat(),
-        "session_id": state.session_id,
-        "event": "Session Ended"
-    }
-    state.logs.append(log_entry)
+    # End session using SessionManager
+    try:
+        result = await session_manager.end_session(session_id, user_id)
 
-    # Save session summary for analytics
-    state.save_session_summary()
+        # Reset legacy global state
+        state.session_active = False
+        state.camera_enabled = False
+        if hasattr(state, 'child_id'):
+            delattr(state, 'child_id')
+        if hasattr(state, 'user_id'):
+            delattr(state, 'user_id')
 
-    session_id = state.session_id
-    log_count = len(state.logs)
+        logger.info(f"Session stopped: {session_id}")
+        return {
+            "status": "stopped",
+            "session_id": session_id,
+            "duration_seconds": result.get("duration_seconds", 0),
+            "total_logs": result.get("total_logs", 0),
+            "timestamp": datetime.now().isoformat()
+        }
 
-    # Reset session state
-    state.session_active = False
-    state.camera_enabled = False
-
-    logger.info(f"Session stopped: {session_id} with {log_count} logs")
-    return {
-        "status": "stopped",
-        "session_id": session_id,
-        "total_logs": log_count,
-        "timestamp": datetime.now().isoformat()
-    }
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Access denied - session belongs to another user")
+    except Exception as e:
+        logger.error(f"Failed to stop session: {e}")
+        # Fall back to legacy behavior
+        state.session_active = False
+        return {
+            "status": "stopped",
+            "session_id": session_id,
+            "message": "Session stopped (fallback mode)"
+        }
 
 @router.get("/status")
 def session_status():
@@ -122,54 +155,50 @@ def session_status():
     }
 
 @router.post("/log")
-def log_session(log: SessionLog):
-    """Log session events"""
+async def log_session(log: SessionLog, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Log session events (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
     state = get_state()
 
-    if not state.session_active:
+    # Get active session
+    session_id = session_manager.get_active_session(user_id) or state.session_id
+
+    if not session_id:
         raise HTTPException(status_code=400, detail="No active session")
 
-    timestamp = datetime.now()
-
-    # Add to memory
+    # Prepare log entry
     log_entry = {
-        "timestamp": timestamp.isoformat(),
-        "session_id": state.session_id,
-        **log.dict()
+        "event": log.event,
+        "note": log.note,
+        "engagement": log.engagement,
+        "music_style": log.music_style,
+        "suggestion": log.suggestion,
+        "caregiver_action": log.caregiver_action,
+        "child_response": log.child_response
     }
-    state.logs.append(log_entry)
 
-    # Save to database
+    # Add log using SessionManager (handles ownership verification)
     try:
-        conn = sqlite3.connect('data/session_logs.db')
-        c = conn.cursor()
-        c.execute("""INSERT INTO logs
-                     (session_id, timestamp, event, engagement, music_style,
-                      suggestion, caregiver_action, child_response, notes)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                  (state.session_id, timestamp.isoformat(), log.event, log.engagement,
-                   log.music_style, log.suggestion, log.caregiver_action,
-                   log.child_response, log.note))
-        conn.commit()
-        conn.close()
+        await session_manager.add_log(session_id, user_id, log_entry)
+
+        # Also add to legacy state for backwards compatibility
+        state.logs.append({
+            "timestamp": datetime.now().isoformat(),
+            "session_id": session_id,
+            **log.dict()
+        })
+
+        logger.info(f"Event logged: {log.event}")
+        return {"status": "logged", "timestamp": datetime.now().isoformat()}
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to save log to database: {e}")
-
-    # Also save to CSV
-    csv_file = f"data/session_{state.session_id}.csv"
-    file_exists = os.path.isfile(csv_file)
-
-    try:
-        with open(csv_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=log_entry.keys())
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(log_entry)
-    except Exception as e:
-        logger.error(f"Failed to save log to CSV: {e}")
-
-    logger.info(f"Event logged: {log.event}")
-    return {"status": "logged", "timestamp": timestamp.isoformat()}
+        logger.error(f"Failed to log event: {e}")
+        raise HTTPException(status_code=500, detail="Failed to log event")
 
 @router.get("/logs")
 def get_logs():
@@ -356,3 +385,32 @@ def set_audio_mode(request: dict = Body(...)):
 
     # Store mode in state if needed
     return {"status": "success", "mode": mode}
+
+
+@router.get("/child/{child_id}/sessions")
+async def get_child_sessions(
+    child_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get all sessions for a specific child (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+
+    # Verify child profile exists and belongs to user
+    profile = await azure_storage.get_child_profile(user_id, child_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+    if profile["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get sessions from Azure Blob Storage
+    sessions = await azure_storage.list_child_sessions(child_id)
+
+    # Sort by start_time descending (most recent first)
+    sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
+
+    return {
+        "child_id": child_id,
+        "child_name": profile["demographics"]["name"],
+        "sessions": sessions,
+        "total_sessions": len(sessions)
+    }

@@ -59,7 +59,7 @@ class Settings:
 
     # OpenAI Configuration (for GPT integration)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    GPT_MODEL: str = os.getenv("GPT_MODEL", "gpt-4o-mini")
+    GPT_MODEL: str = os.getenv("GPT_MODEL", "gpt-5.1")  # Updated to GPT-5.1 (Nov 2025)
     GPT_TEMPERATURE: float = float(os.getenv("GPT_TEMPERATURE", "0.7"))
 
     # MCP Server Configuration
@@ -76,6 +76,27 @@ class Settings:
 
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "dev-jwt-secret-change-in-production")
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRATION_MINUTES: int = int(os.getenv("JWT_EXPIRATION_MINUTES", "10080"))  # 7 days
+
+    # Email Configuration (Zoho SMTP)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.zoho.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "")
+    FROM_NAME: str = os.getenv("FROM_NAME", "musicASD")
+
+    # Azure Blob Storage Configuration
+    AZURE_STORAGE_CONNECTION_STRING: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
+    AZURE_CONTAINER_NAME: str = os.getenv("AZURE_CONTAINER_NAME", "musicasd-container")
+    AZURE_USE_EMULATOR: bool = os.getenv("AZURE_USE_EMULATOR", "false").lower() == "true"
+
+    # Redis Configuration
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_MAX_CONNECTIONS: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "10"))
+    REDIS_DECODE_RESPONSES: bool = os.getenv("REDIS_DECODE_RESPONSES", "true").lower() == "true"
 
     # Feature Flags
     ENABLE_ANALYTICS: bool = os.getenv("ENABLE_ANALYTICS", "true").lower() == "true"

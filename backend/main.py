@@ -1,22 +1,34 @@
 """
 Project ASD Backend Server - Main Entry Point
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import pygame
 import uvicorn
+
+# Import slowapi for rate limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 # Import configuration and state
 from core.config import settings
 from core.state import SessionState
 
 # Import API routers
-from api import analytics, engagement, music, session, camera, health
+from api import analytics, engagement, music, session, camera, health, auth, profile
+
+# Import services
+from services.azure_storage import azure_storage
+from services.redis_client import redis_client
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -24,6 +36,10 @@ app = FastAPI(
     version=settings.APP_VERSION,
     description="Music Therapy Assistant for ASD Support"
 )
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS
 app.add_middleware(
@@ -50,6 +66,8 @@ except Exception as e:
 state = SessionState()
 
 # Include API routers
+app.include_router(auth.router)  # Authentication endpoints
+app.include_router(profile.router)  # Child profile management
 app.include_router(analytics.router)
 app.include_router(engagement.router)
 app.include_router(music.router)
@@ -67,6 +85,8 @@ def read_root():
         "environment": settings.ENVIRONMENT,
         "music_files": sum(len(files) for files in state.music_library.values()),
         "endpoints": {
+            "auth": "/auth/* (register, login, me)",
+            "profile": "/profile/* (create, list, update child profiles)",
             "analytics": "/api/v1/analytics/dashboard",
             "engagement": "/engagement (GET/POST)",
             "music": "/music/* (play, stop, library, generate)",
@@ -83,6 +103,26 @@ async def startup_event():
     """Initialize application on startup"""
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
+
+    # Initialize Redis
+    try:
+        redis_client.connect()
+        if redis_client.is_connected():
+            logger.info("✓ Redis connected and ready")
+        else:
+            logger.warning("⚠ Redis not available - running without caching")
+    except Exception as e:
+        logger.warning(f"⚠ Redis initialization failed: {e}")
+
+    # Initialize Azure Blob Storage
+    if settings.AZURE_STORAGE_CONNECTION_STRING:
+        try:
+            await azure_storage.initialize()
+            logger.info("✓ Azure Blob Storage initialized successfully")
+        except Exception as e:
+            logger.error(f"✗ Failed to initialize Azure Blob Storage: {e}")
+    else:
+        logger.warning("⚠ Azure Blob Storage not configured (connection string missing)")
 
     # Display music library status
     logger.info("Music Library Status:")
@@ -106,6 +146,21 @@ async def shutdown_event():
     # Save any pending session data
     if state.session_active:
         state.save_session_summary()
+
+    # Close Redis connection
+    try:
+        redis_client.close()
+        logger.info("✓ Redis connection closed")
+    except Exception as e:
+        logger.error(f"Error closing Redis: {e}")
+
+    # Close Azure Blob Storage connection
+    if settings.AZURE_STORAGE_CONNECTION_STRING:
+        try:
+            await azure_storage.close()
+            logger.info("✓ Azure Blob Storage connection closed")
+        except Exception as e:
+            logger.error(f"✗ Error closing Azure Blob Storage: {e}")
 
     logger.info("Server shutdown complete")
 

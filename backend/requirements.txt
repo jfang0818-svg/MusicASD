@@ -11,3 +11,11 @@ seaborn==0.13.2
 scipy
 pygame==2.6.1
 python-multipart==0.0.20
+pyjwt==2.9.0
+passlib[bcrypt]==1.7.4
+azure-storage-blob==12.22.0
+azure-identity==1.19.0
+aiohttp==3.9.1
+slowapi==0.1.9
+redis==5.0.1
+hiredis==2.3.2

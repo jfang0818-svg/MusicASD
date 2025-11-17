@@ -1,7 +1,6 @@
 """
 Session State Management
 """
-import sqlite3
 import logging
 from pathlib import Path
 from datetime import datetime
@@ -31,9 +30,8 @@ class SessionState:
 
         # Initialize components
         self.init_directories()
-        self.init_database()
         self.scan_music_library()
-        self.load_session_history()
+        # Note: Session history now managed by SessionManager with Redis + Azure
 
     def init_directories(self):
         """Create necessary directories"""
@@ -50,42 +48,6 @@ class SessionState:
             directory.mkdir(parents=True, exist_ok=True)
 
         logger.info("Directories initialized")
-
-    def init_database(self):
-        """Initialize SQLite database for session logs"""
-        try:
-            conn = sqlite3.connect('data/session_logs.db')
-            c = conn.cursor()
-
-            # Create logs table
-            c.execute('''CREATE TABLE IF NOT EXISTS logs
-                         (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                          session_id TEXT,
-                          timestamp TEXT,
-                          event TEXT,
-                          engagement TEXT,
-                          music_style TEXT,
-                          suggestion TEXT,
-                          caregiver_action TEXT,
-                          child_response TEXT,
-                          notes TEXT)''')
-
-            # Create sessions summary table for analytics
-            c.execute('''CREATE TABLE IF NOT EXISTS sessions
-                         (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                          session_id TEXT UNIQUE,
-                          start_time TEXT,
-                          end_time TEXT,
-                          duration_minutes INTEGER,
-                          avg_engagement TEXT,
-                          music_styles_used TEXT,
-                          total_events INTEGER)''')
-
-            conn.commit()
-            conn.close()
-            logger.info("Database initialized successfully")
-        except Exception as e:
-            logger.error(f"Database initialization failed: {e}")
 
     def scan_music_library(self):
         """Scan and load all music files from assets folder"""
@@ -177,95 +139,15 @@ class SessionState:
             logger.warning(f"Could not get duration for {filepath}: {e}")
             return 0.0
 
-    def load_session_history(self):
-        """Load session history from database for analytics"""
-        try:
-            conn = sqlite3.connect('data/session_logs.db')
-            c = conn.cursor()
-
-            # Get recent sessions
-            c.execute("""SELECT session_id, start_time, end_time, duration_minutes,
-                               avg_engagement, music_styles_used, total_events
-                        FROM sessions
-                        ORDER BY start_time DESC
-                        LIMIT 100""")
-
-            rows = c.fetchall()
-
-            self.sessions_history = []
-            for row in rows:
-                self.sessions_history.append({
-                    "session_id": row[0],
-                    "start_time": row[1],
-                    "end_time": row[2],
-                    "duration_minutes": row[3],
-                    "avg_engagement": row[4],
-                    "music_styles_used": row[5],
-                    "total_events": row[6]
-                })
-
-            conn.close()
-            logger.info(f"Loaded {len(self.sessions_history)} sessions from history")
-
-        except Exception as e:
-            logger.error(f"Failed to load session history: {e}")
-            self.sessions_history = []
+    # Legacy methods removed - session history now managed by SessionManager
+    # with Redis + Azure Blob Storage
 
     def save_session_summary(self):
-        """Save session summary when session ends"""
-        if not self.session_id or not self.logs:
-            logger.warning("No session data to save")
-            return
-
-        try:
-            # Calculate session metrics
-            start_time = self.logs[0]["timestamp"] if self.logs else datetime.now().isoformat()
-            end_time = self.logs[-1]["timestamp"] if self.logs else datetime.now().isoformat()
-
-            # Calculate duration
-            start_dt = datetime.fromisoformat(start_time)
-            end_dt = datetime.fromisoformat(end_time)
-            duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
-
-            # Calculate average engagement
-            engagement_scores = {"LOW": 1, "MED": 2, "HIGH": 3}
-            engagements = [log.get("engagement", "MED") for log in self.logs if log.get("engagement")]
-
-            if engagements:
-                avg_score = sum(engagement_scores.get(e, 2) for e in engagements) / len(engagements)
-                avg_engagement = ["LOW", "MED", "HIGH"][min(2, max(0, int(avg_score) - 1))]
-            else:
-                avg_engagement = "MED"
-
-            # Get music styles used
-            music_styles = list(set([
-                log.get("music_style", "")
-                for log in self.logs
-                if log.get("music_style")
-            ]))
-            music_styles_str = ",".join(filter(None, music_styles))
-
-            # Save to database
-            conn = sqlite3.connect('data/session_logs.db')
-            c = conn.cursor()
-
-            c.execute("""INSERT OR REPLACE INTO sessions
-                         (session_id, start_time, end_time, duration_minutes,
-                          avg_engagement, music_styles_used, total_events)
-                         VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                      (self.session_id, start_time, end_time, duration_minutes,
-                       avg_engagement, music_styles_str, len(self.logs)))
-
-            conn.commit()
-            conn.close()
-
-            logger.info(f"Saved session summary for {self.session_id}")
-            logger.info(f"  Duration: {duration_minutes} minutes")
-            logger.info(f"  Average engagement: {avg_engagement}")
-            logger.info(f"  Events logged: {len(self.logs)}")
-
-        except Exception as e:
-            logger.error(f"Failed to save session summary: {e}")
+        """
+        Legacy method - no longer saves to SQLite
+        Session data now managed by SessionManager with Redis + Azure
+        """
+        logger.info("save_session_summary called (legacy - now handled by SessionManager)")
 
     def reset_session(self):
         """Reset session-related state"""

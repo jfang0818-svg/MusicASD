@@ -27,6 +27,9 @@ interface SessionState {
   // Actions
   startSession: (userId: string) => Promise<void>;
   stopSession: () => Promise<void>;
+  setSessionActive: (active: boolean) => void;
+  setSessionId: (id: string | null) => void;
+  resetSession: () => void;
   updateEngagement: (level: EngagementLevel) => Promise<void>;
   setAutoSuggest: (value: boolean) => void;
   generateSuggestion: (engagement: EngagementLevel) => void;
@@ -84,6 +87,27 @@ export const useSessionStore = create<SessionState>((set, get) => ({
       sessionActive: false,
       sessionId: null,
       currentSuggestion: null
+    });
+  },
+
+  // Set session active state (for external updates)
+  setSessionActive: (active: boolean) => {
+    set({ sessionActive: active });
+  },
+
+  // Set session ID (for external updates)
+  setSessionId: (id: string | null) => {
+    set({ sessionId: id });
+  },
+
+  // Reset session state
+  resetSession: () => {
+    set({
+      sessionActive: false,
+      sessionId: null,
+      engagement: 'MED',
+      currentSuggestion: null,
+      logs: []
     });
   },
 

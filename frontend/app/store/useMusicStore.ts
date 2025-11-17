@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import {
   getMusicLibrary,
   generateMusic,
-  deleteGeneratedMusic
+  deleteGeneratedMusic,
+  apiClient
 } from '@/app/lib/api';
 import toast from 'react-hot-toast';
 import type { MusicLibrary, GeneratedTone } from '@/app/types';
@@ -46,26 +47,17 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   playMusic: async (style: 'calm' | 'happy' | 'energetic', file?: string) => {
     set({ loading: true });
     try {
-      const response = await fetch('/api/backend/music/play', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          style,
-          volume: get().volume,
-          file
-        })
+      const response = await apiClient.post('/music/play', {
+        style,
+        volume: get().volume,
+        file
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        set({
-          musicPlaying: true,
-          currentMusic: file || style
-        });
-        toast.success(`Playing ${style} music`);
-      } else {
-        throw new Error('Failed to play music');
-      }
+      set({
+        musicPlaying: true,
+        currentMusic: file || style
+      });
+      toast.success(`Playing ${style} music`);
     } catch (error) {
       console.error('Error playing music:', error);
       toast.error('Failed to play music');
@@ -77,7 +69,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   // Stop music
   stopMusic: async () => {
     try {
-      await fetch('/api/backend/music/stop', { method: 'POST' });
+      await apiClient.post('/music/stop');
       set({ musicPlaying: false, currentMusic: null });
     } catch (error) {
       console.error('Error stopping music:', error);
@@ -91,11 +83,8 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   // Load music library
   loadMusicLibrary: async () => {
     try {
-      const response = await fetch('/api/backend/music/library');
-      if (response.ok) {
-        const data = await response.json();
-        set({ musicLibrary: data.library || { calm: [], happy: [], energetic: [] } });
-      }
+      const response = await apiClient.get('/music/library');
+      set({ musicLibrary: response.data.library || { calm: [], happy: [], energetic: [] } });
     } catch (error) {
       console.error('Error loading music library:', error);
       toast.error('Failed to load music library');
@@ -105,11 +94,8 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   // Load generated tones
   loadGeneratedTones: async () => {
     try {
-      const response = await fetch('/api/backend/music/generated');
-      if (response.ok) {
-        const data = await response.json();
-        set({ generatedTones: data.tones || [] });
-      }
+      const response = await apiClient.get('/music/generated');
+      set({ generatedTones: response.data.tones || [] });
     } catch (error) {
       console.error('Error loading generated tones:', error);
     }
@@ -122,17 +108,12 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
     set({ loading: true });
     try {
-      const response = await fetch(`/api/backend/music/upload/${style}`, {
-        method: 'POST',
-        body: formData
+      await apiClient.post(`/music/upload/${style}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      if (response.ok) {
-        await get().loadMusicLibrary();
-        toast.success(`Successfully uploaded ${file.name}`);
-      } else {
-        throw new Error('Upload failed');
-      }
+      await get().loadMusicLibrary();
+      toast.success(`Successfully uploaded ${file.name}`);
     } catch (error) {
       console.error('Error uploading file:', error);
       toast.error('Failed to upload file');
@@ -144,14 +125,9 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   // Delete generated tone
   deleteGeneratedTone: async (toneName: string) => {
     try {
-      const response = await fetch(`/api/backend/music/generated/delete/${toneName}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        await get().loadGeneratedTones();
-        toast.success('Tone deleted successfully');
-      }
+      await apiClient.delete(`/music/generated/delete/${toneName}`);
+      await get().loadGeneratedTones();
+      toast.success('Tone deleted successfully');
     } catch (error) {
       console.error('Error deleting tone:', error);
       toast.error('Failed to delete tone');

@@ -73,7 +73,7 @@ class GenerateMusicRequest(BaseModel):
     duration: float = Field(default=5.0, ge=1.0, le=30.0)
     filename: str = Field(default="generated", max_length=50)
     tempo: int = Field(default=120, ge=60, le=200)
-    key: str = Field(default="C", regex="^[A-G]$")
+    key: str = Field(default="C", pattern="^[A-G]$")
 
     @validator('filename')
     def validate_filename(cls, v):
@@ -292,3 +292,292 @@ class VolumeControl(BaseModel):
                 "volume": 0.5
             }
         }
+
+# ===================== AUTHENTICATION MODELS =====================
+
+class UserRegister(BaseModel):
+    """User registration request"""
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, description="Password (min 8 characters)")
+    name: str = Field(..., description="Parent/Caregiver name")
+    phone: Optional[str] = Field(None, description="Phone number")
+    is_caregiver: bool = Field(False, description="Is the user a caregiver?")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parent@example.com",
+                "password": "SecurePass123",
+                "name": "Jane Doe",
+                "phone": "+1234567890",
+                "is_caregiver": True
+            }
+        }
+
+class UserLogin(BaseModel):
+    """User login request"""
+    email: str
+    password: str
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parent@example.com",
+                "password": "SecurePass123"
+            }
+        }
+
+class TokenResponse(BaseModel):
+    """JWT token response"""
+    access_token: str
+    token_type: str = "bearer"
+    user_id: str
+    email: str
+    name: str
+
+class UserResponse(BaseModel):
+    """User profile response"""
+    id: str
+    email: str
+    name: str
+    phone: Optional[str] = None
+    is_caregiver: bool = False
+    subscription_status: str = "trial"  # trial, active, expired
+    trial_start_date: Optional[datetime] = None
+    trial_end_date: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+class SendVerificationCodeRequest(BaseModel):
+    """Send verification code request"""
+    email: str = Field(..., description="Email address to send verification code")
+    is_caregiver: bool = Field(False, description="Is the user a caregiver?")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parent@example.com",
+                "is_caregiver": True
+            }
+        }
+
+class VerifyCodeRequest(BaseModel):
+    """Verify email code request"""
+    email: str = Field(..., description="Email address")
+    code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parent@example.com",
+                "code": "123456"
+            }
+        }
+
+class PasswordResetRequest(BaseModel):
+    """Request password reset"""
+    email: str = Field(..., description="Email address for password reset")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parent@example.com"
+            }
+        }
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password with token"""
+    token: str = Field(..., description="Password reset token from email")
+    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "token": "reset_token_here",
+                "new_password": "NewSecurePass123"
+            }
+        }
+
+# ===================== CHILD PROFILE MODELS =====================
+
+class SensorySensitivities(BaseModel):
+    """Sensory sensitivities for ASD child"""
+    sound_sensitivity: Optional[str] = Field(None, description="Sound sensitivity level (low/medium/high)")
+    touch_sensitivity: Optional[str] = Field(None, description="Touch sensitivity level")
+    visual_sensitivity: Optional[str] = Field(None, description="Visual sensitivity level")
+    loud_noises_trigger: bool = Field(False, description="Are loud noises a trigger?")
+    sudden_sounds_trigger: bool = Field(False, description="Are sudden sounds a trigger?")
+    specific_triggers: Optional[str] = Field(None, description="Specific sensory triggers")
+    calming_sounds: Optional[str] = Field(None, description="Sounds that help calm the child")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "sound_sensitivity": "high",
+                "touch_sensitivity": "medium",
+                "visual_sensitivity": "low",
+                "loud_noises_trigger": True,
+                "sudden_sounds_trigger": True,
+                "specific_triggers": "High-pitched sounds, sirens",
+                "calming_sounds": "White noise, ocean waves"
+            }
+        }
+
+class CommunicationAbilities(BaseModel):
+    """Communication abilities"""
+    verbal_communication: str = Field(..., description="Verbal communication level (non-verbal/limited/fluent)")
+    speech_clarity: Optional[str] = Field(None, description="Speech clarity (if verbal)")
+    uses_aac: bool = Field(False, description="Uses AAC devices?")
+    preferred_communication: Optional[str] = Field(None, description="Preferred communication method")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "verbal_communication": "limited",
+                "speech_clarity": "Some words, mostly gestures",
+                "uses_aac": False,
+                "preferred_communication": "Gestures and pointing"
+            }
+        }
+
+class BehavioralPatterns(BaseModel):
+    """Behavioral patterns"""
+    repetitive_behaviors: Optional[str] = Field(None, description="Common repetitive behaviors")
+    meltdown_triggers: Optional[str] = Field(None, description="Common meltdown triggers")
+    calming_activities: Optional[str] = Field(None, description="Activities that help calm")
+    attention_span: Optional[str] = Field(None, description="Typical attention span")
+    social_interaction: Optional[str] = Field(None, description="Level of social interaction")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "repetitive_behaviors": "Hand flapping, rocking",
+                "meltdown_triggers": "Transitions, unexpected changes",
+                "calming_activities": "Listening to music, swinging",
+                "attention_span": "5-10 minutes for preferred activities",
+                "social_interaction": "Prefers parallel play, limited eye contact"
+            }
+        }
+
+class MusicPreferences(BaseModel):
+    """Music preferences"""
+    preferred_genres: Optional[List[str]] = Field(None, description="Preferred music genres")
+    preferred_instruments: Optional[List[str]] = Field(None, description="Preferred instruments")
+    preferred_tempo: Optional[str] = Field(None, description="Preferred tempo (slow/medium/fast)")
+    disliked_music: Optional[List[str]] = Field(None, description="Music types that cause distress")
+    successful_therapy_music: Optional[str] = Field(None, description="Music that has worked well in therapy")
+    negative_reaction_music: Optional[str] = Field(None, description="Music that caused negative reactions")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "preferred_genres": ["classical", "ambient", "nature sounds"],
+                "preferred_instruments": ["piano", "violin", "nature sounds"],
+                "preferred_tempo": "slow",
+                "disliked_music": ["heavy metal", "rap", "loud drums"],
+                "successful_therapy_music": "Mozart piano sonatas, ocean wave recordings",
+                "negative_reaction_music": "Fast-paced electronic music"
+            }
+        }
+
+class ChildDemographics(BaseModel):
+    """Child demographics"""
+    name: str = Field(..., description="Child's name")
+    age: int = Field(..., ge=0, le=120, description="Child's age")
+    gender: Optional[str] = Field(None, description="Gender")
+    race: Optional[str] = Field(None, description="Race/Ethnicity")
+    diagnosis_date: Optional[str] = Field(None, description="ASD diagnosis date (YYYY-MM-DD)")
+    asd_level: Optional[str] = Field(None, description="ASD support level (1/2/3)")
+    comorbidities: Optional[List[str]] = Field(None, description="Other diagnoses")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "name": "Alex",
+                "age": 7,
+                "gender": "Male",
+                "race": "Asian",
+                "diagnosis_date": "2020-03-15",
+                "asd_level": "2",
+                "comorbidities": ["ADHD", "Anxiety"]
+            }
+        }
+
+class TherapyGoals(BaseModel):
+    """Therapy goals"""
+    goals: Optional[List[str]] = Field(None, description="Parent-defined therapy goals")
+    focus_areas: Optional[List[str]] = Field(None, description="Areas to focus on")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "goals": ["Improve emotional regulation", "Increase attention span", "Reduce anxiety"],
+                "focus_areas": ["Sensory processing", "Social skills", "Communication"]
+            }
+        }
+
+class ChildProfileCreate(BaseModel):
+    """Create child profile"""
+    demographics: ChildDemographics
+    sensory_sensitivities: Optional[SensorySensitivities] = None
+    communication: Optional[CommunicationAbilities] = None
+    behavioral_patterns: Optional[BehavioralPatterns] = None
+    music_preferences: Optional[MusicPreferences] = None
+    therapy_goals: Optional[TherapyGoals] = None
+
+class ChildProfileUpdate(BaseModel):
+    """Update child profile (all fields optional)"""
+    demographics: Optional[ChildDemographics] = None
+    sensory_sensitivities: Optional[SensorySensitivities] = None
+    communication: Optional[CommunicationAbilities] = None
+    behavioral_patterns: Optional[BehavioralPatterns] = None
+    music_preferences: Optional[MusicPreferences] = None
+    therapy_goals: Optional[TherapyGoals] = None
+
+class ChildProfileResponse(BaseModel):
+    """Child profile response"""
+    id: str
+    user_id: str
+    demographics: ChildDemographics
+    sensory_sensitivities: Optional[SensorySensitivities] = None
+    communication: Optional[CommunicationAbilities] = None
+    behavioral_patterns: Optional[BehavioralPatterns] = None
+    music_preferences: Optional[MusicPreferences] = None
+    therapy_goals: Optional[TherapyGoals] = None
+    created_at: datetime
+    updated_at: datetime
+
+# ===================== MUSIC ELEMENT ANALYSIS =====================
+
+class MusicElements(BaseModel):
+    """GPT-generated music elements for therapy"""
+    tempo_range: str = Field(..., description="Recommended tempo range (e.g., '60-80 BPM')")
+    key: str = Field(..., description="Recommended musical key")
+    instruments: List[str] = Field(..., description="Recommended instruments")
+    dynamics: str = Field(..., description="Dynamics level (soft/moderate/loud)")
+    mood: str = Field(..., description="Overall mood")
+    avoid_elements: List[str] = Field(..., description="Elements to avoid")
+    recommended_duration: str = Field(..., description="Recommended track duration")
+    style_tags: List[str] = Field(..., description="Style tags for music generation")
+    reasoning: Optional[str] = Field(None, description="GPT reasoning for these choices")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "tempo_range": "60-80 BPM",
+                "key": "C major",
+                "instruments": ["piano", "soft strings", "nature sounds"],
+                "dynamics": "soft to moderate",
+                "mood": "calm, soothing",
+                "avoid_elements": ["loud drums", "sudden changes", "dissonance"],
+                "recommended_duration": "3-5 minutes",
+                "style_tags": ["ambient", "classical", "nature"],
+                "reasoning": "Based on high sound sensitivity and preference for slow tempo"
+            }
+        }
+
+class MusicElementsResponse(BaseModel):
+    """Music elements analysis response"""
+    child_id: str
+    elements: MusicElements
+    analyzed_at: datetime
