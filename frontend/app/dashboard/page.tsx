@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PlayCircle, Sparkles, Plus, LogOut, User } from 'lucide-react';
+import { PlayCircle, Sparkles, Plus, LogOut } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { getChildProfiles } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,7 +12,7 @@ import { useState } from 'react';
 export default function DashboardPage() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [_hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   const { data: children, isLoading } = useQuery({
     queryKey: ['child-profiles'],

@@ -2,12 +2,13 @@ import axios, { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 
 // API Base URLs from environment variables
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use Next.js proxy for API calls to avoid CORS issues
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/backend';
 const MCP_URL = process.env.NEXT_PUBLIC_MCP_URL || 'http://localhost:3000/api/mcp';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
 // Create axios instances
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -144,7 +145,7 @@ export async function getSession(sessionId: string): Promise<Session> {
 }
 
 export async function getSessions(limit = 20): Promise<Session[]> {
-  const { data } = await apiClient.get('/sessions', { params: { limit } });
+  const { data } = await apiClient.get('/session/sessions', { params: { limit } });
   return data;
 }
 

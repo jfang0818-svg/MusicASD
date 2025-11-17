@@ -211,6 +211,23 @@ class AzureStorageService:
                     sessions.append(session_data)
         return sessions
 
+    async def list_user_sessions(self, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """List all sessions for a user across all their children"""
+        sessions = []
+        prefix = "sessions/"
+
+        async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+            if blob.name.endswith(".json"):
+                session_data = await self._load_json(blob.name)
+                if session_data and session_data.get("user_id") == user_id:
+                    sessions.append(session_data)
+
+                    # Stop if we've reached the limit
+                    if len(sessions) >= limit:
+                        break
+
+        return sessions
+
     async def delete_child_sessions(self, child_id: str) -> bool:
         """Delete all sessions for a child"""
         prefix = f"sessions/child_{child_id}/"

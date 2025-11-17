@@ -1,6 +1,7 @@
 """
 Session API endpoints
 """
+
 from fastapi import APIRouter, HTTPException, Body, Depends
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -385,6 +386,23 @@ def set_audio_mode(request: dict = Body(...)):
 
     # Store mode in state if needed
     return {"status": "success", "mode": mode}
+
+
+@router.get("/sessions")
+async def get_all_sessions(
+    limit: int = 50,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get all sessions for the current user (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+
+    # Get sessions from Azure Blob Storage
+    sessions = await azure_storage.list_user_sessions(user_id, limit)
+
+    # Sort by start_time descending (most recent first)
+    sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
+
+    return sessions
 
 
 @router.get("/child/{child_id}/sessions")

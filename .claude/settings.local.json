@@ -17,7 +17,14 @@
       "Bash(copy package.json package.json.backup)",
       "Bash(npm install:*)",
       "Bash(npx @next/codemod@canary next-async-request-api .)",
-      "Bash(npx @next/codemod@canary next-async-request-api:*)"
+      "Bash(npx @next/codemod@canary next-async-request-api:*)",
+      "Bash(cmd //c taskkill //PID 37704 //F)",
+      "Bash(cmd //c taskkill //PID 32464 //F)",
+      "Bash(cmd //c taskkill //PID 30312 //F)",
+      "Bash(cmd //c taskkill //PID 23224 //F)",
+      "Bash(kill-servers.bat)",
+      "Bash(cmd //c kill-servers.bat)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

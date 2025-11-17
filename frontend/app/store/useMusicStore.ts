@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import {
-  getMusicLibrary,
   generateMusic,
-  deleteGeneratedMusic,
   apiClient
 } from '@/app/lib/api';
 import toast from 'react-hot-toast';
@@ -47,7 +45,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   playMusic: async (style: 'calm' | 'happy' | 'energetic', file?: string) => {
     set({ loading: true });
     try {
-      const response = await apiClient.post('/music/play', {
+      await apiClient.post('/music/play', {
         style,
         volume: get().volume,
         file
@@ -138,7 +136,11 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   generateNewMusic: async (options) => {
     set({ loading: true });
     try {
-      const track = await generateMusic(options);
+      const track = await generateMusic({
+        mood: options.style,
+        duration: options.duration,
+        tempo: options.tempo,
+      });
       await get().loadGeneratedTones();
       toast.success(`Generated: ${track.name}`);
     } catch (error) {

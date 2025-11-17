@@ -79,7 +79,7 @@ export default function MusicLibraryPage() {
     if (selectedCategory !== 'generated') {
       Object.entries(musicLibrary).forEach(([category, files]) => {
         if (selectedCategory === 'all' || selectedCategory === category) {
-          files.forEach(file => {
+          files.forEach((file: { name: string; duration?: number }) => {
             if (!searchQuery || file.name.toLowerCase().includes(searchQuery.toLowerCase())) {
               results.push({
                 name: file.name,

@@ -10,11 +10,11 @@ const nextConfig = {
     return [
       {
         source: '/api/backend/:path*',
-        destination: 'http://localhost:8000/:path*', // Python FastAPI backend
+        destination: 'http://127.0.0.1:8000/:path*', // Python FastAPI backend (IPv4)
       },
       {
         source: '/api/mcp/:path*',
-        destination: 'http://localhost:8001/:path*', // MCP server
+        destination: 'http://127.0.0.1:8001/:path*', // MCP server (IPv4)
       },
     ];
   },
@@ -44,22 +44,6 @@ const nextConfig = {
         pathname: '/assets/**',
       },
     ],
-  },
-
-  // Webpack configuration for audio files
-  webpack: (config) => {
-    config.module.rules.push({
-      test: /\.(mp3|wav|ogg)$/,
-      use: {
-        loader: 'file-loader',
-        options: {
-          publicPath: '/_next/static/audio/',
-          outputPath: 'static/audio/',
-          name: '[name].[hash].[ext]',
-        },
-      },
-    });
-    return config;
   },
 
   // Environment variables

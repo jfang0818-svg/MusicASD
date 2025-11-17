@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getChildProfile, getMusicElements, analyzeChildProfile, getMusicEffectiveness } from '../../../lib/api';
 import { motion } from 'framer-motion';
@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 
 export default function ProfileAnalysisPage() {
   const params = useParams();
-  const router = useRouter();
   const queryClient = useQueryClient();
   const childId = params.id as string;
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -23,14 +22,14 @@ export default function ProfileAnalysisPage() {
   });
 
   // Fetch music elements (if they exist)
-  const { data: musicElements, isLoading: elementsLoading, error: elementsError } = useQuery({
+  const { data: musicElements, isLoading: _elementsLoading, error: elementsError } = useQuery({
     queryKey: ['music-elements', childId],
     queryFn: () => getMusicElements(childId),
     retry: false,
   });
 
   // Fetch music effectiveness data
-  const { data: musicEffectiveness, isLoading: effectivenessLoading } = useQuery({
+  const { data: musicEffectiveness, isLoading: _effectivenessLoading } = useQuery({
     queryKey: ['music-effectiveness', childId],
     queryFn: () => getMusicEffectiveness(childId),
     retry: false,

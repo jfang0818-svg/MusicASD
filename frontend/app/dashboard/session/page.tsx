@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getChildProfiles, getMusicElements, startSessionForChild, stopSessionUpdated } from '../../lib/api';
@@ -19,7 +19,7 @@ import { motion } from 'framer-motion';
 import { User, Sparkles, AlertCircle, Music } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function SessionPage() {
+function SessionContent() {
   const searchParams = useSearchParams();
   const urlChildId = searchParams.get('childId');
 
@@ -36,8 +36,7 @@ export default function SessionPage() {
     generateSuggestion,
     acceptSuggestion,
     skipSuggestion,
-    logResponse,
-    addLog
+    logResponse
   } = useSessionStore();
 
   // Music state
@@ -59,7 +58,7 @@ export default function SessionPage() {
   // Local UI state
   const [selectedChildId, setSelectedChildId] = useState<string>(urlChildId || '');
   const [cameraEnabled, setCameraEnabled] = useState(false);
-  const [selectedStyle, setSelectedStyle] = useState<'calm' | 'happy' | 'energetic'>('calm');
+  const [selectedStyle, _setSelectedStyle] = useState<'calm' | 'happy' | 'energetic'>('calm');
   const [loading, setLoading] = useState(false);
   const [showStartConfirmModal, setShowStartConfirmModal] = useState(false);
 
@@ -71,7 +70,7 @@ export default function SessionPage() {
   const [sessionSummary, setSessionSummary] = useState<any>(null);
 
   // Fetch children profiles
-  const { data: children, isLoading: childrenLoading } = useQuery({
+  const { data: children, isLoading: _childrenLoading } = useQuery({
     queryKey: ['child-profiles'],
     queryFn: getChildProfiles,
   });
@@ -478,5 +477,23 @@ export default function SessionPage() {
         summaryData={sessionSummary}
       />
     </div>
+    </div>
+  );
+}
+
+export default function SessionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-lg font-semibold text-gray-700">Loading session...</p>
+          </div>
+        </div>
+      }
+    >
+      <SessionContent />
+    </Suspense>
   );
 }

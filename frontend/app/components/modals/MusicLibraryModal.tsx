@@ -106,7 +106,7 @@ export function MusicLibraryModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
                   {files.length > 0 ? (
-                    files.map((file, index) => (
+                    files.map((file: { name: string; duration?: number }, index: number) => (
                       <div
                         key={index}
                         onClick={() => handleCardClick(style as 'calm' | 'happy' | 'energetic', file.name)}
@@ -161,7 +161,7 @@ export function MusicLibraryModal({
                     <Upload className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     <span className="text-sm font-medium">Upload new {style} music:</span>
                     <input
-                      ref={el => fileInputRefs.current[style] = el}
+                      ref={el => { fileInputRefs.current[style] = el; }}
                       id={`upload-${style}`}
                       type="file"
                       accept=".mp3,.wav,.ogg"

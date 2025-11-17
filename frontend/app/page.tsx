@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Music, Brain, Users, BarChart3, Sparkles, Heart, Zap } from 'lucide-react';
+import { Sparkles, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function HomePage() {

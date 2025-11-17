@@ -108,7 +108,6 @@ export default function RegisterPage() {
         email: email,
         password: formData.password,
         phone: formData.phone || undefined,
-        is_caregiver: isCaregiver,
       });
     } catch (error) {
       console.error('Registration error:', error);

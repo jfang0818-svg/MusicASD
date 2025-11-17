@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { loginUser, registerUser, getCurrentUser, logout as logoutAPI } from '../lib/api';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';

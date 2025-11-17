@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Sparkles, Music } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMusicStore } from '@/app/store/useMusicStore';
 import type { ModalProps } from '@/app/types';

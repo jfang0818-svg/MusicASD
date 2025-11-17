@@ -38,7 +38,7 @@ class EngagementUpdate(BaseModel):
     level: EngagementLevel
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "level": "MED"
             }
@@ -59,7 +59,7 @@ class MusicRequest(BaseModel):
     file: Optional[str] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "style": "calm",
                 "volume": 0.7,
@@ -81,7 +81,7 @@ class GenerateMusicRequest(BaseModel):
         return v.replace("/", "_").replace("\\", "_").replace("..", "_")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "style": "calm",
                 "duration": 10.0,
@@ -118,7 +118,7 @@ class SessionLog(BaseModel):
     child_response: Optional[str] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "event": "Music Started",
                 "note": "Child showed interest in the melody",
@@ -157,7 +157,7 @@ class CameraToggle(BaseModel):
     enabled: bool
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "enabled": True
             }
@@ -202,7 +202,7 @@ class GPTSuggestion(BaseModel):
     mcp_sequence: Optional[List[str]] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "suggestion": "Try calming music to help regulate",
                 "style": "calm",
@@ -218,7 +218,7 @@ class CaregiverAction(BaseModel):
     modified_style: Optional[MusicStyle] = None
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "action": "accepted",
                 "note": "Child responded well",
@@ -256,7 +256,7 @@ class ErrorResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "error": "Invalid request",
                 "detail": "Engagement level must be LOW, MED, or HIGH",
@@ -287,7 +287,7 @@ class VolumeControl(BaseModel):
     volume: float = Field(..., ge=0.0, le=1.0)
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "volume": 0.5
             }
@@ -304,7 +304,7 @@ class UserRegister(BaseModel):
     is_caregiver: bool = Field(False, description="Is the user a caregiver?")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "parent@example.com",
                 "password": "SecurePass123",
@@ -320,7 +320,7 @@ class UserLogin(BaseModel):
     password: str
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "parent@example.com",
                 "password": "SecurePass123"
@@ -354,7 +354,7 @@ class SendVerificationCodeRequest(BaseModel):
     is_caregiver: bool = Field(False, description="Is the user a caregiver?")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "parent@example.com",
                 "is_caregiver": True
@@ -367,7 +367,7 @@ class VerifyCodeRequest(BaseModel):
     code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "parent@example.com",
                 "code": "123456"
@@ -379,7 +379,7 @@ class PasswordResetRequest(BaseModel):
     email: str = Field(..., description="Email address for password reset")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "email": "parent@example.com"
             }
@@ -391,7 +391,7 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "token": "reset_token_here",
                 "new_password": "NewSecurePass123"
@@ -411,7 +411,7 @@ class SensorySensitivities(BaseModel):
     calming_sounds: Optional[str] = Field(None, description="Sounds that help calm the child")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "sound_sensitivity": "high",
                 "touch_sensitivity": "medium",
@@ -431,7 +431,7 @@ class CommunicationAbilities(BaseModel):
     preferred_communication: Optional[str] = Field(None, description="Preferred communication method")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "verbal_communication": "limited",
                 "speech_clarity": "Some words, mostly gestures",
@@ -449,7 +449,7 @@ class BehavioralPatterns(BaseModel):
     social_interaction: Optional[str] = Field(None, description="Level of social interaction")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "repetitive_behaviors": "Hand flapping, rocking",
                 "meltdown_triggers": "Transitions, unexpected changes",
@@ -469,7 +469,7 @@ class MusicPreferences(BaseModel):
     negative_reaction_music: Optional[str] = Field(None, description="Music that caused negative reactions")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "preferred_genres": ["classical", "ambient", "nature sounds"],
                 "preferred_instruments": ["piano", "violin", "nature sounds"],
@@ -491,7 +491,7 @@ class ChildDemographics(BaseModel):
     comorbidities: Optional[List[str]] = Field(None, description="Other diagnoses")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "name": "Alex",
                 "age": 7,
@@ -509,7 +509,7 @@ class TherapyGoals(BaseModel):
     focus_areas: Optional[List[str]] = Field(None, description="Areas to focus on")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "goals": ["Improve emotional regulation", "Increase attention span", "Reduce anxiety"],
                 "focus_areas": ["Sensory processing", "Social skills", "Communication"]
@@ -562,7 +562,7 @@ class MusicElements(BaseModel):
     reasoning: Optional[str] = Field(None, description="GPT reasoning for these choices")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "tempo_range": "60-80 BPM",
                 "key": "C major",
