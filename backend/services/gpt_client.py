@@ -282,3 +282,300 @@ Please provide music element recommendations tailored to this child's specific n
             "style_tags": ["ambient", "classical", "nature"],
             "reasoning": "Conservative therapeutic defaults for ASD music therapy"
         }
+
+    async def get_music_recommendation(
+        self,
+        child_profile: Dict[str, Any],
+        session_history: list[Dict[str, Any]],
+        current_engagement: str,
+        caregiver_goals: list[str],
+        time_of_day: str = "",
+        session_duration: int = 0
+    ) -> Dict[str, Any]:
+        """
+        Get comprehensive music recommendation using LLM with full context.
+
+        This considers:
+        - Child's complete profile and preferences
+        - Historical session data (what music worked before)
+        - Current engagement level
+        - Caregiver's therapeutic goals
+        - Time of day and session progress
+
+        Returns detailed music recommendation with parameters for generation.
+        """
+        try:
+            # Build comprehensive context
+            context = self._build_recommendation_context(
+                child_profile, session_history, current_engagement,
+                caregiver_goals, time_of_day, session_duration
+            )
+
+            # System prompt for music recommendation
+            system_prompt = """You are an expert music therapist specializing in ASD (Autism Spectrum Disorder) treatment.
+Your task is to provide personalized music recommendations based on comprehensive session context.
+
+You will receive:
+1. Child's complete profile (sensory sensitivities, preferences, behavioral patterns)
+2. Historical session data showing what music worked or didn't work
+3. Current engagement level
+4. Caregiver's therapeutic goals
+5. Session context (time of day, duration)
+
+Provide a detailed, evidence-based music recommendation optimized for this specific child.
+
+Output JSON with these exact fields:
+{
+    "recommended_style": "calm|happy|energetic",
+    "tempo_bpm": "Number in BPM",
+    "musical_key": "Musical key (e.g., 'C major')",
+    "mood": "Detailed mood description",
+    "instruments": ["List of recommended instruments"],
+    "duration_minutes": "Recommended duration",
+    "volume_level": "soft|moderate|loud",
+    "transition_type": "gradual|immediate",
+    "specific_parameters": {
+        "complexity": "simple|moderate|complex",
+        "rhythm_pattern": "steady|varied|syncopated",
+        "melodic_contour": "ascending|descending|varied",
+        "harmonic_structure": "simple|rich"
+    },
+    "therapeutic_rationale": "Why this recommendation is optimal",
+    "expected_outcome": "What therapeutic outcome to expect",
+    "caregiver_phrase": "Short phrase for caregiver to say (max 15 words)",
+    "confidence_score": "0.0-1.0 confidence in this recommendation",
+    "alternative_if_ineffective": "What to try if this doesn't work"
+}
+
+Key principles:
+- ALWAYS learn from session history (what worked before)
+- Prioritize child safety and comfort over engagement goals
+- Consider sensory sensitivities as highest priority
+- Use gradual transitions for children with high sensitivity
+- Match music to current state, not just desired state
+- Be specific and actionable in recommendations"""
+
+            # Call GPT-4/5
+            response = await self.client.chat.completions.create(
+                model="gpt-4",  # Use gpt-4 for cost-effectiveness, can upgrade to gpt-5.1 later
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": context}
+                ],
+                temperature=0.7,
+                response_format={"type": "json_object"}
+            )
+
+            # Parse and validate response
+            content = response.choices[0].message.content
+            recommendation = json.loads(content)
+
+            # Validate required fields
+            required_fields = [
+                "recommended_style", "tempo_bpm", "musical_key", "mood",
+                "instruments", "duration_minutes", "therapeutic_rationale",
+                "caregiver_phrase", "confidence_score"
+            ]
+
+            for field in required_fields:
+                if field not in recommendation:
+                    recommendation[field] = self._get_default_recommendation_field(field)
+
+            # Ensure style is valid
+            if recommendation["recommended_style"] not in ["calm", "happy", "energetic"]:
+                recommendation["recommended_style"] = "calm"
+
+            # Add metadata
+            recommendation["generated_at"] = json.dumps({"timestamp": "now"})
+            recommendation["context_used"] = {
+                "child_id": child_profile.get("id"),
+                "engagement": current_engagement,
+                "sessions_analyzed": len(session_history)
+            }
+
+            return recommendation
+
+        except Exception as e:
+            print(f"GPT Music Recommendation Error: {e}")
+            return self._get_fallback_recommendation(current_engagement)
+
+    def _build_recommendation_context(
+        self,
+        child_profile: Dict[str, Any],
+        session_history: list[Dict[str, Any]],
+        current_engagement: str,
+        caregiver_goals: list[str],
+        time_of_day: str,
+        session_duration: int
+    ) -> str:
+        """Build comprehensive context for music recommendation"""
+
+        # Extract profile data
+        demographics = child_profile.get("demographics", {})
+        sensory = child_profile.get("sensory_sensitivities", {})
+        music_prefs = child_profile.get("music_preferences", {})
+
+        # Analyze session history for patterns
+        effective_music = []
+        ineffective_music = []
+
+        for session in session_history[-10:]:  # Last 10 sessions
+            feedback = session.get("music_feedback", {})
+            if feedback.get("effectiveness") == "very_effective" or feedback.get("effectiveness") == "effective":
+                effective_music.append({
+                    "style": session.get("music_style"),
+                    "tempo": session.get("tempo"),
+                    "outcome": session.get("outcome_notes")
+                })
+            elif feedback.get("effectiveness") == "not_effective":
+                ineffective_music.append({
+                    "style": session.get("music_style"),
+                    "reason": feedback.get("notes")
+                })
+
+        # Build context string
+        context = f"""MUSIC THERAPY RECOMMENDATION REQUEST
+
+CHILD PROFILE:
+- Name: {demographics.get('name', 'Unknown')}
+- Age: {demographics.get('age')} years
+- ASD Level: {demographics.get('asd_level')}
+- Sound Sensitivity: {sensory.get('sound_sensitivity')}
+- Preferred Music: {', '.join(music_prefs.get('preferred_genres', []))}
+- Calming Sounds: {sensory.get('calming_sounds')}
+- Triggers to Avoid: {sensory.get('specific_triggers')}
+
+CURRENT SESSION CONTEXT:
+- Engagement Level: {current_engagement}
+- Time of Day: {time_of_day or 'Not specified'}
+- Session Duration So Far: {session_duration} minutes
+- Therapeutic Goals: {', '.join(caregiver_goals) if caregiver_goals else 'General engagement'}
+
+HISTORICAL DATA (Last 10 Sessions):
+Effective Music (worked well):
+{json.dumps(effective_music, indent=2) if effective_music else 'No feedback data yet'}
+
+Ineffective Music (did not work):
+{json.dumps(ineffective_music, indent=2) if ineffective_music else 'No negative feedback'}
+
+CAREGIVER REQUEST:
+Please provide a music recommendation that:
+1. Learns from what worked before (see effective music above)
+2. Avoids what didn't work (see ineffective music above)
+3. Addresses current engagement level: {current_engagement}
+4. Aligns with therapeutic goals: {', '.join(caregiver_goals) if caregiver_goals else 'engagement'}
+5. Respects sensory sensitivities and triggers
+
+Provide specific, actionable parameters for music generation."""
+
+        return context
+
+    def _get_default_recommendation_field(self, field: str) -> Any:
+        """Get default values for missing recommendation fields"""
+        defaults = {
+            "recommended_style": "calm",
+            "tempo_bpm": "70",
+            "musical_key": "C major",
+            "mood": "calm and soothing",
+            "instruments": ["piano", "soft strings"],
+            "duration_minutes": "5",
+            "volume_level": "soft",
+            "transition_type": "gradual",
+            "therapeutic_rationale": "Safe default choice for ASD therapy",
+            "expected_outcome": "Gentle engagement",
+            "caregiver_phrase": "Let's listen to calming music together",
+            "confidence_score": "0.5",
+            "alternative_if_ineffective": "Try happy music with slightly faster tempo"
+        }
+        return defaults.get(field, "")
+
+    def _get_fallback_recommendation(self, engagement: str) -> Dict[str, Any]:
+        """Fallback recommendation if GPT fails"""
+        fallbacks = {
+            "LOW": {
+                "recommended_style": "happy",
+                "tempo_bpm": "90",
+                "musical_key": "C major",
+                "mood": "uplifting and gentle",
+                "instruments": ["piano", "light percussion", "flute"],
+                "duration_minutes": "5",
+                "therapeutic_rationale": "Happy music to gently increase engagement",
+                "caregiver_phrase": "Let's try some cheerful music!",
+                "confidence_score": "0.6"
+            },
+            "MED": {
+                "recommended_style": "calm",
+                "tempo_bpm": "70",
+                "musical_key": "D major",
+                "mood": "peaceful and steady",
+                "instruments": ["piano", "strings", "nature sounds"],
+                "duration_minutes": "7",
+                "therapeutic_rationale": "Calm music to maintain balanced engagement",
+                "caregiver_phrase": "You're doing great! Let's keep this peaceful feeling",
+                "confidence_score": "0.7"
+            },
+            "HIGH": {
+                "recommended_style": "calm",
+                "tempo_bpm": "60",
+                "musical_key": "A minor",
+                "mood": "very calming and grounding",
+                "instruments": ["soft piano", "gentle strings", "ambient sounds"],
+                "duration_minutes": "10",
+                "therapeutic_rationale": "Very calm music to help regulate high energy",
+                "caregiver_phrase": "Let's take a quiet moment together",
+                "confidence_score": "0.7"
+            }
+        }
+
+        base_recommendation = fallbacks.get(engagement, fallbacks["MED"])
+        base_recommendation.update({
+            "volume_level": "soft",
+            "transition_type": "gradual",
+            "specific_parameters": {
+                "complexity": "simple",
+                "rhythm_pattern": "steady",
+                "melodic_contour": "gentle",
+                "harmonic_structure": "simple"
+            },
+            "expected_outcome": "Appropriate engagement response",
+            "alternative_if_ineffective": "Consult with therapist for personalized approach"
+        })
+
+        return base_recommendation
+
+    async def get_completion(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 2000
+    ) -> str:
+        """
+        Get a completion from GPT for general prompts (e.g., melody generation)
+
+        Args:
+            prompt: The prompt to send to GPT
+            temperature: Sampling temperature (0.0-1.0)
+            max_tokens: Maximum tokens in response
+
+        Returns:
+            The completion text from GPT
+        """
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
+            return response.choices[0].message.content
+
+        except Exception as e:
+            print(f"GPT Completion Error: {e}")
+            raise
+
+
+# Singleton instance
+gpt_client = GPTClient()

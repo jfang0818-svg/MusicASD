@@ -17,7 +17,7 @@ from core.config import settings
 from core.state import SessionState
 
 # Import API routers
-from api import analytics, engagement, music, session, camera, health, auth, profile
+from api import analytics, engagement, music, session, camera, health, auth, profile, websocket_analysis, goals, session_notes
 
 # Import services
 from services.azure_storage import azure_storage
@@ -68,12 +68,15 @@ state = SessionState()
 # Include API routers
 app.include_router(auth.router)  # Authentication endpoints
 app.include_router(profile.router)  # Child profile management
+app.include_router(goals.router)  # Goal tracking
+app.include_router(session_notes.router)  # Session notes and observations
 app.include_router(analytics.router)
 app.include_router(engagement.router)
 app.include_router(music.router)
 app.include_router(session.router)
 app.include_router(camera.router)
 app.include_router(health.router)
+app.include_router(websocket_analysis.router)  # WebSocket for video/audio analysis
 
 # Root endpoint
 @app.get("/")

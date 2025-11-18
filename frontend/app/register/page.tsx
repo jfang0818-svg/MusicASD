@@ -178,19 +178,21 @@ export default function RegisterPage() {
         <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/50">
           {/* Header */}
           <div className="text-center mb-6">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200 }}
-              className="inline-block"
-            >
-              <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 mx-auto shadow-lg">
-                <span className="text-3xl">🎶</span>
-              </div>
-            </motion.div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-indigo-600 bg-clip-text text-transparent">
-              Join musicASD
-            </h1>
+            <Link href="/" className="inline-block group cursor-pointer">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200 }}
+                className="inline-block"
+              >
+                <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4 mx-auto shadow-lg group-hover:shadow-xl transition-shadow">
+                  <span className="text-3xl">🎶</span>
+                </div>
+              </motion.div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-indigo-600 bg-clip-text text-transparent group-hover:from-cyan-500 group-hover:to-indigo-500 transition-all">
+                Join musicASD
+              </h1>
+            </Link>
             <p className="text-gray-600 mt-2">Start your child's music therapy journey</p>
 
             {/* Step Indicator */}

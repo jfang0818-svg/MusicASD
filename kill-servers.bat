@@ -14,4 +14,3 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') 
 )
 
 echo Done! All development servers stopped.
-pause

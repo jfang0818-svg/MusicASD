@@ -24,7 +24,22 @@
       "Bash(cmd //c taskkill //PID 23224 //F)",
       "Bash(kill-servers.bat)",
       "Bash(cmd //c kill-servers.bat)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -m pip install:*)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -m pip install -r backend/requirements.txt)",
+      "Bash(code .)",
+      "Bash(curl:*)",
+      "Bash(nul)",
+      "Bash(cmd //c taskkill //PID 15756 //F)",
+      "Bash(cmd //c \"C:\\development\\on_going_proj\\musicASD\\kill-servers.bat\")",
+      "Bash(cmd //c taskkill //PID 21688 //F)",
+      "Bash(cmd //c taskkill //PID 23472 //F)",
+      "Bash(copy /b \"services\\gpt_client.py\"+,, \"services\\gpt_client.py\")",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -m pip install setuptools)",
+      "Bash(=65.0.0)",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c \"import pkg_resources; print(''pkg_resources OK'')\")",
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c \"import librosa; import speech_recognition; print(''Audio libraries OK'')\")"
     ],
     "deny": [],
     "ask": []

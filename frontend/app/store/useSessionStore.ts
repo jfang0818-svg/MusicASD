@@ -113,15 +113,9 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
   // Update engagement
   updateEngagement: async (level: EngagementLevel) => {
-    const { sessionId } = get();
-    if (sessionId) {
-      await sendEngagementData(sessionId, {
-        timestamp: Date.now(),
-        attention: level === 'HIGH' ? 0.9 : level === 'MED' ? 0.6 : 0.3,
-        interaction: level === 'HIGH' ? 0.85 : level === 'MED' ? 0.5 : 0.2,
-        response: level === 'HIGH' ? 0.95 : level === 'MED' ? 0.7 : 0.4,
-        overall: level === 'HIGH' ? 0.9 : level === 'MED' ? 0.6 : 0.3
-      });
+    const { sessionActive } = get();
+    if (sessionActive) {
+      await sendEngagementData(level);
     }
 
     set({ engagement: level });

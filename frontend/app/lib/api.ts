@@ -46,7 +46,10 @@ const handleApiError = (error: AxiosError) => {
                   (error.response?.data as any)?.message ||
                   'An unexpected error occurred';
 
-  console.error('API Error:', error);
+  // Only log non-404 errors to console (404s are often expected)
+  if (error.response?.status !== 404) {
+    console.error('API Error:', error);
+  }
 
   // Handle 401 (unauthorized) - redirect to login
   if (error.response?.status === 401) {
@@ -55,7 +58,8 @@ const handleApiError = (error: AxiosError) => {
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-  } else {
+  } else if (error.response?.status !== 404) {
+    // Don't show toast for 404 errors - let calling code handle them
     toast.error(message);
   }
 
@@ -170,12 +174,12 @@ export async function deleteGeneratedMusic(trackId: string): Promise<void> {
 }
 
 // Engagement Tracking
-export async function sendEngagementData(sessionId: string, data: EngagementData): Promise<void> {
-  await apiClient.post(`/sessions/${sessionId}/engagement`, data);
+export async function sendEngagementData(level: string): Promise<void> {
+  await apiClient.post('/engagement', { level });
 }
 
-export async function getEngagementHistory(sessionId: string): Promise<EngagementData[]> {
-  const { data } = await apiClient.get(`/sessions/${sessionId}/engagement`);
+export async function getEngagementHistory(): Promise<any> {
+  const { data } = await apiClient.get('/engagement/history');
   return data;
 }
 
@@ -398,5 +402,248 @@ export async function getEngagementTrends(childId: string, days: number = 30) {
 
 export async function getDashboardAnalytics() {
   const response = await apiClient.get('/api/v1/analytics/dashboard');
+  return response.data;
+}
+
+// ==================== MUSIC RECOMMENDATIONS API ====================
+
+export interface MusicRecommendation {
+  recommended_style: 'calm' | 'happy' | 'energetic';
+  tempo_bpm: string;
+  musical_key: string;
+  mood: string;
+  instruments: string[];
+  duration_minutes: string;
+  volume_level: 'soft' | 'moderate' | 'loud';
+  transition_type: 'gradual' | 'immediate';
+  specific_parameters: {
+    complexity: string;
+    rhythm_pattern: string;
+    melodic_contour: string;
+    harmonic_structure: string;
+  };
+  therapeutic_rationale: string;
+  expected_outcome: string;
+  caregiver_phrase: string;
+  confidence_score: string;
+  alternative_if_ineffective?: string;
+}
+
+export async function getMusicRecommendation(data: {
+  child_id: string;
+  current_engagement: 'LOW' | 'MED' | 'HIGH';
+  caregiver_goals?: string[];
+  time_of_day?: string;
+  session_duration?: number;
+}) {
+  const response = await apiClient.post('/music/recommend', data);
+  return response.data;
+}
+
+export async function submitMusicFeedback(data: {
+  session_id: string;
+  child_id: string;
+  music_style: string;
+  tempo?: number;
+  effectiveness: 'very_effective' | 'effective' | 'neutral' | 'not_effective';
+  notes?: string;
+  outcome_notes?: string;
+}) {
+  const response = await apiClient.post('/music/feedback', data);
+  return response.data;
+}
+
+export async function getMusicFeedbackHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/music/feedback/history/${childId}?limit=${limit}`);
+  return response.data;
+}
+
+// ==================== GOALS API ====================
+
+export interface TherapyGoal {
+  goal_id: string;
+  child_id: string;
+  category: 'communication' | 'joint_attention' | 'emotional_regulation' | 'social_skills' | 'motor_skills' | 'sensory_processing';
+  title: string;
+  description: string;
+  measurement_type: 'count' | 'duration' | 'frequency' | 'quality_1_5' | 'percentage' | 'yes_no';
+  baseline: number;
+  target: number;
+  unit: string;
+  status: 'not_started' | 'in_progress' | 'achieved' | 'revised' | 'discontinued';
+  current_value: number;
+  sessions_tracked: number;
+  created_date: string;
+  target_date?: string;
+  notes?: string;
+  intervention_strategies: string[];
+}
+
+export interface GoalProgress {
+  progress_id: string;
+  goal_id: string;
+  session_id: string;
+  measured_value: number;
+  measurement_type: string;
+  timestamp: string;
+  notes?: string;
+  music_style_used?: string;
+  engagement_level?: string;
+  relative_to_baseline?: number;
+  relative_to_target?: number;
+}
+
+export interface GoalSummary {
+  goal: TherapyGoal;
+  progress_entries: GoalProgress[];
+  total_sessions: number;
+  average_value: number;
+  latest_value: number;
+  improvement_percent: number;
+  target_progress_percent: number;
+  trend: 'improving' | 'stable' | 'declining' | 'insufficient_data';
+  sessions_above_target: number;
+  sessions_below_target: number;
+  ai_recommendation?: string;
+}
+
+export async function getGoalTemplates() {
+  const response = await apiClient.get('/goals/templates');
+  return response.data;
+}
+
+export async function createGoal(data: {
+  child_id: string;
+  category: string;
+  title: string;
+  description: string;
+  measurement_type: string;
+  baseline: number;
+  target: number;
+  unit: string;
+  target_date?: string;
+  notes?: string;
+  intervention_strategies?: string[];
+}) {
+  const response = await apiClient.post('/goals/create', data);
+  return response.data;
+}
+
+export async function getChildGoals(
+  childId: string,
+  statusFilter?: string,
+  categoryFilter?: string
+) {
+  const params = new URLSearchParams();
+  if (statusFilter) params.append('status_filter', statusFilter);
+  if (categoryFilter) params.append('category_filter', categoryFilter);
+
+  const response = await apiClient.get(`/goals/child/${childId}?${params.toString()}`);
+  return response.data;
+}
+
+export async function getGoal(goalId: string) {
+  const response = await apiClient.get(`/goals/${goalId}`);
+  return response.data;
+}
+
+export async function updateGoal(goalId: string, data: {
+  title?: string;
+  description?: string;
+  target?: number;
+  target_date?: string;
+  status?: string;
+  notes?: string;
+  intervention_strategies?: string[];
+}) {
+  const response = await apiClient.put(`/goals/${goalId}`, data);
+  return response.data;
+}
+
+export async function deleteGoal(goalId: string) {
+  const response = await apiClient.delete(`/goals/${goalId}`);
+  return response.data;
+}
+
+export async function recordGoalProgress(data: {
+  goal_id: string;
+  session_id: string;
+  measured_value: number;
+  notes?: string;
+  music_style_used?: string;
+  engagement_level?: string;
+}) {
+  const response = await apiClient.post('/goals/progress/record', data);
+  return response.data;
+}
+
+export async function getGoalSummary(goalId: string) {
+  const response = await apiClient.get(`/goals/${goalId}/summary`);
+  return response.data;
+}
+
+// ==================== SESSION NOTES API ====================
+
+export interface SessionNote {
+  note_id: string;
+  session_id: string;
+  child_id: string;
+  note_type: 'observation' | 'breakthrough' | 'challenge' | 'safety' | 'strategy' | 'response';
+  content: string;
+  timestamp: string;
+  session_time_elapsed?: number;
+  music_style?: string;
+  engagement_level?: string;
+  session_phase?: string;
+  created_by?: string;
+  tags: string[];
+}
+
+export async function createSessionNote(data: {
+  session_id: string;
+  child_id: string;
+  note_type: string;
+  content: string;
+  session_time_elapsed?: number;
+  music_style?: string;
+  engagement_level?: string;
+  session_phase?: string;
+  tags?: string[];
+}) {
+  const response = await apiClient.post('/session-notes/create', data);
+  return response.data;
+}
+
+export async function getSessionNotes(sessionId: string, noteType?: string) {
+  const params = noteType ? `?note_type=${noteType}` : '';
+  const response = await apiClient.get(`/session-notes/session/${sessionId}${params}`);
+  return response.data;
+}
+
+export async function getChildNotes(childId: string, limit = 50, noteType?: string) {
+  const params = new URLSearchParams();
+  params.append('limit', limit.toString());
+  if (noteType) params.append('note_type', noteType);
+
+  const response = await apiClient.get(`/session-notes/child/${childId}?${params.toString()}`);
+  return response.data;
+}
+
+export async function updateSessionNote(noteId: string, data: {
+  content?: string;
+  note_type?: string;
+  tags?: string[];
+}) {
+  const response = await apiClient.put(`/session-notes/${noteId}`, data);
+  return response.data;
+}
+
+export async function deleteSessionNote(noteId: string) {
+  const response = await apiClient.delete(`/session-notes/${noteId}`);
+  return response.data;
+}
+
+export async function getSessionNotesSummary(sessionId: string) {
+  const response = await apiClient.get(`/session-notes/session/${sessionId}/summary`);
   return response.data;
 }

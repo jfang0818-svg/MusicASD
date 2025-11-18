@@ -10,6 +10,7 @@ interface MusicState {
   // Music state
   musicPlaying: boolean;
   currentMusic: string | null;
+  currentStyle: 'calm' | 'happy' | 'energetic' | null;
   volume: number;
   musicLibrary: MusicLibrary;
   generatedTones: GeneratedTone[];
@@ -17,6 +18,7 @@ interface MusicState {
 
   // Actions
   playMusic: (style: 'calm' | 'happy' | 'energetic', file?: string) => Promise<void>;
+  playMusicAdaptive: (style: 'calm' | 'happy' | 'energetic', reason?: string) => Promise<void>;
   stopMusic: () => Promise<void>;
   setVolume: (volume: number) => void;
   loadMusicLibrary: () => Promise<void>;
@@ -36,6 +38,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   // Initial state
   musicPlaying: false,
   currentMusic: null,
+  currentStyle: null,
   volume: 0.7,
   musicLibrary: { calm: [], happy: [], energetic: [] },
   generatedTones: [],
@@ -53,7 +56,8 @@ export const useMusicStore = create<MusicState>((set, get) => ({
 
       set({
         musicPlaying: true,
-        currentMusic: file || style
+        currentMusic: file || style,
+        currentStyle: style
       });
       toast.success(`Playing ${style} music`);
     } catch (error) {
@@ -64,11 +68,42 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     }
   },
 
+  // Play music adaptively (with AI reasoning)
+  playMusicAdaptive: async (style: 'calm' | 'happy' | 'energetic', reason?: string) => {
+    set({ loading: true });
+    try {
+      await apiClient.post('/music/play', {
+        style,
+        volume: get().volume
+      });
+
+      set({
+        musicPlaying: true,
+        currentMusic: style,
+        currentStyle: style
+      });
+
+      const message = reason
+        ? `🎵 ${reason}`
+        : `AI switched to ${style} music`;
+
+      toast(message, {
+        icon: '🤖',
+        duration: 4000,
+      });
+    } catch (error) {
+      console.error('Error playing adaptive music:', error);
+      toast.error('Failed to adapt music');
+    } finally {
+      set({ loading: false });
+    }
+  },
+
   // Stop music
   stopMusic: async () => {
     try {
       await apiClient.post('/music/stop');
-      set({ musicPlaying: false, currentMusic: null });
+      set({ musicPlaying: false, currentMusic: null, currentStyle: null });
     } catch (error) {
       console.error('Error stopping music:', error);
       toast.error('Failed to stop music');

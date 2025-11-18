@@ -19,3 +19,16 @@ aiohttp==3.9.1
 slowapi==0.1.9
 redis==5.0.1
 hiredis==2.3.2
+setuptools>=65.0.0
+
+# Feature 2: Camera/Audio Analysis
+opencv-python==4.8.1.78
+mediapipe==0.10.21
+librosa==0.10.1
+SpeechRecognition==3.10.1
+websockets==12.0
+
+# Feature 3: AI Music Generation (MIDI)
+midiutil==1.2.1
+pretty_midi==0.2.10
+pyfluidsynth==1.3.2

@@ -29,8 +29,10 @@ export function formatDuration(seconds: number): string {
 /**
  * Format date to localized string
  */
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'Invalid Date';
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
@@ -41,8 +43,10 @@ export function formatDate(date: Date | string): string {
 /**
  * Format time to localized string
  */
-export function formatTime(date: Date | string): string {
+export function formatTime(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
   const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return 'Invalid Time';
   return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',

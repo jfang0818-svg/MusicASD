@@ -1,9 +1,10 @@
 """
 Music API endpoints
 """
-from fastapi import APIRouter, HTTPException, File, UploadFile, Body
+from fastapi import APIRouter, HTTPException, File, UploadFile, Body, Depends
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from pathlib import Path
 from datetime import datetime
 import random
@@ -12,6 +13,11 @@ import scipy.io.wavfile as wavfile
 import pygame
 import time
 import logging
+from services.gpt_client import gpt_client
+from services.auth import auth_service, security
+from services.azure_storage import azure_storage
+from services.midi_generator import midi_generator
+from services.audio_synthesizer import audio_synthesizer
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/music", tags=["music"])
@@ -28,6 +34,10 @@ class GenerateMusicRequest(BaseModel):
     filename: str = "generated"
     tempo: int = 120
     key: str = "C"
+    use_ai: bool = False  # Use AI (GPT-4 + MIDI) vs rule-based generation
+    child_id: Optional[str] = None  # For AI personalization
+    mood: str = "peaceful"
+    complexity: str = "simple"  # simple, moderate, complex
 
 def get_state():
     from main import state
@@ -202,80 +212,160 @@ async def upload_music(style: str, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate")
-def generate_music(request: GenerateMusicRequest):
-    """Generate synthetic music/tones"""
+async def generate_music(request: GenerateMusicRequest):
+    """Generate synthetic music/tones or AI-generated MIDI music"""
     state = get_state()
 
     try:
-        sample_rate = 22050
-        duration_samples = int(sample_rate * request.duration)
+        # AI-generated MIDI music
+        if request.use_ai:
+            # Check if synthesizer is available
+            synth_status = audio_synthesizer.get_status()
+            if not synth_status["ready"]:
+                # Fallback to simple wave generation if no synthesizer
+                logger.warning("No synthesizer available, falling back to wave generation")
+                request.use_ai = False
 
-        base_freq = {"C": 261.63, "D": 293.66, "E": 329.63, "F": 349.23, "G": 392.00, "A": 440.00}
-        root = base_freq.get(request.key, 261.63)
+        # Only proceed with AI generation if use_ai is still True
+        if request.use_ai:
+            # Get child context if provided
+            child_context = None
+            if request.child_id:
+                try:
+                    child_profile = await azure_storage.get_child_profile(request.child_id)
+                    child_context = child_profile
+                except:
+                    child_context = {"child_id": request.child_id}
 
-        if request.style == "calm":
-            frequencies = [root, root * 1.25, root * 1.5]
-            tempo_factor = 0.5
-        elif request.style == "happy":
-            frequencies = [root, root * 1.25, root * 1.5, root * 2]
-            tempo_factor = 1.0
-        else:  # energetic
-            frequencies = [root, root * 1.125, root * 1.25, root * 1.5, root * 1.667]
-            tempo_factor = 1.5
+            # Generate MIDI file
+            midi_result = await midi_generator.generate_midi(
+                style=request.style,
+                tempo=request.tempo,
+                duration_seconds=int(request.duration),
+                key=request.key,
+                mood=request.mood,
+                complexity=request.complexity,
+                use_ai=True,
+                child_context=child_context
+            )
 
-        beat_duration = 60.0 / (request.tempo * tempo_factor)
+            # Convert MIDI to WAV
+            audio_result = await audio_synthesizer.synthesize(midi_result["file_path"])
 
-        t = np.linspace(0, request.duration, duration_samples)
-        wave = np.zeros(duration_samples)
+            # Copy to standard music directory
+            timestamp = int(time.time())
+            final_filename = f"ai_{request.filename}_{request.style}_{timestamp}.wav"
+            final_path = Path(f"assets/music/generated") / final_filename
+            final_path.parent.mkdir(parents=True, exist_ok=True)
 
-        for i, freq in enumerate(frequencies):
-            wave += 0.5 * np.sin(2 * np.pi * freq * t) * (1 - i * 0.15)
-            wave += 0.25 * np.sin(2 * np.pi * freq * 2 * t) * (1 - i * 0.15)
-            beat_pattern = np.sin(2 * np.pi * t / beat_duration) > 0
-            wave += 0.1 * np.sin(2 * np.pi * freq * 0.5 * t) * beat_pattern
+            # Copy the synthesized audio
+            import shutil
+            shutil.copy(audio_result["wav_path"], str(final_path))
 
-        attack = int(0.1 * duration_samples)
-        decay = int(0.2 * duration_samples)
-        sustain_level = 0.7
-        release = int(0.3 * duration_samples)
+            state.scan_music_library()
 
-        envelope = np.ones(duration_samples)
-        envelope[:attack] = np.linspace(0, 1, attack)
-        envelope[attack:attack+decay] = np.linspace(1, sustain_level, decay)
-        envelope[-release:] = np.linspace(sustain_level, 0, release)
+            tone_info = {
+                "name": final_filename,
+                "style": request.style,
+                "duration": request.duration,
+                "tempo": request.tempo,
+                "key": request.key,
+                "mood": request.mood,
+                "complexity": request.complexity,
+                "ai_generated": True,
+                "midi_path": midi_result["file_path"],
+                "notes_count": midi_result["notes_count"],
+                "created": datetime.now().isoformat()
+            }
+            state.generated_tones.append(tone_info)
 
-        wave = wave * envelope
-        wave = np.int16(wave / np.max(np.abs(wave)) * 32767 * 0.7)
+            logger.info(f"Generated AI music: {final_filename}")
+            return {
+                "status": "success",
+                "filename": final_filename,
+                "style": request.style,
+                "duration": request.duration,
+                "tempo": request.tempo,
+                "key": request.key,
+                "mood": request.mood,
+                "complexity": request.complexity,
+                "ai_generated": True,
+                "notes_count": midi_result["notes_count"],
+                "synthesizer": audio_result["synthesizer"],
+                "path": str(final_path)
+            }
 
-        timestamp = int(time.time())
-        filename = f"{request.filename}_{request.style}_{timestamp}.wav"
-        filepath = Path(f"assets/music/generated") / filename
-        filepath.parent.mkdir(parents=True, exist_ok=True)
+        # Traditional wave generation (original code)
+        else:
+            sample_rate = 22050
+            duration_samples = int(sample_rate * request.duration)
 
-        wavfile.write(str(filepath), sample_rate, wave)
+            base_freq = {"C": 261.63, "D": 293.66, "E": 329.63, "F": 349.23, "G": 392.00, "A": 440.00}
+            root = base_freq.get(request.key, 261.63)
 
-        state.scan_music_library()
+            if request.style == "calm":
+                frequencies = [root, root * 1.25, root * 1.5]
+                tempo_factor = 0.5
+            elif request.style == "happy":
+                frequencies = [root, root * 1.25, root * 1.5, root * 2]
+                tempo_factor = 1.0
+            else:  # energetic
+                frequencies = [root, root * 1.125, root * 1.25, root * 1.5, root * 1.667]
+                tempo_factor = 1.5
 
-        tone_info = {
-            "name": filename,
-            "style": request.style,
-            "duration": request.duration,
-            "tempo": request.tempo,
-            "key": request.key,
-            "created": datetime.now().isoformat()
-        }
-        state.generated_tones.append(tone_info)
+            beat_duration = 60.0 / (request.tempo * tempo_factor)
 
-        logger.info(f"Generated tone: {filename}")
-        return {
-            "status": "success",
-            "filename": filename,
-            "style": request.style,
-            "duration": request.duration,
-            "tempo": request.tempo,
-            "key": request.key,
-            "path": str(filepath)
-        }
+            t = np.linspace(0, request.duration, duration_samples)
+            wave = np.zeros(duration_samples)
+
+            for i, freq in enumerate(frequencies):
+                wave += 0.5 * np.sin(2 * np.pi * freq * t) * (1 - i * 0.15)
+                wave += 0.25 * np.sin(2 * np.pi * freq * 2 * t) * (1 - i * 0.15)
+                beat_pattern = np.sin(2 * np.pi * t / beat_duration) > 0
+                wave += 0.1 * np.sin(2 * np.pi * freq * 0.5 * t) * beat_pattern
+
+            attack = int(0.1 * duration_samples)
+            decay = int(0.2 * duration_samples)
+            sustain_level = 0.7
+            release = int(0.3 * duration_samples)
+
+            envelope = np.ones(duration_samples)
+            envelope[:attack] = np.linspace(0, 1, attack)
+            envelope[attack:attack+decay] = np.linspace(1, sustain_level, decay)
+            envelope[-release:] = np.linspace(sustain_level, 0, release)
+
+            wave = wave * envelope
+            wave = np.int16(wave / np.max(np.abs(wave)) * 32767 * 0.7)
+
+            timestamp = int(time.time())
+            filename = f"{request.filename}_{request.style}_{timestamp}.wav"
+            filepath = Path(f"assets/music/generated") / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            wavfile.write(str(filepath), sample_rate, wave)
+
+            state.scan_music_library()
+
+            tone_info = {
+                "name": filename,
+                "style": request.style,
+                "duration": request.duration,
+                "tempo": request.tempo,
+                "key": request.key,
+                "created": datetime.now().isoformat()
+            }
+            state.generated_tones.append(tone_info)
+
+            logger.info(f"Generated tone: {filename}")
+            return {
+                "status": "success",
+                "filename": filename,
+                "style": request.style,
+                "duration": request.duration,
+                "tempo": request.tempo,
+                "key": request.key,
+                "path": str(filepath)
+            }
     except Exception as e:
         logger.error(f"Generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -311,6 +401,193 @@ def set_volume(volume: float = Body(..., ge=0.0, le=1.0)):
 def get_volume():
     """Get current music volume"""
     return {"volume": pygame.mixer.music.get_volume()}
+
+# ==================== LLM MUSIC RECOMMENDATIONS ====================
+
+class MusicRecommendationRequest(BaseModel):
+    child_id: str
+    current_engagement: str  # LOW, MED, HIGH
+    caregiver_goals: Optional[List[str]] = []
+    time_of_day: Optional[str] = ""
+    session_duration: Optional[int] = 0
+
+class MusicFeedbackRequest(BaseModel):
+    session_id: str
+    child_id: str
+    music_style: str
+    tempo: Optional[int] = None
+    effectiveness: str  # very_effective, effective, neutral, not_effective
+    notes: Optional[str] = ""
+    outcome_notes: Optional[str] = ""
+
+@router.post("/recommend")
+async def get_music_recommendation(
+    request: MusicRecommendationRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get LLM-powered music recommendation based on comprehensive context.
+
+    Considers:
+    - Child's complete profile (sensory sensitivities, preferences)
+    - Historical session data (what music worked before)
+    - Current engagement level
+    - Caregiver's therapeutic goals
+    - Session context (time of day, duration)
+    """
+    try:
+        user_id = auth_service.get_current_user_id(credentials)
+
+        # Get child profile
+        profile = await azure_storage.get_child_profile(user_id, request.child_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Child profile not found")
+
+        # Verify ownership
+        if profile.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get session history for this child
+        sessions = await azure_storage.list_child_sessions(request.child_id)
+
+        # Call GPT client for recommendation
+        recommendation = await gpt_client.get_music_recommendation(
+            child_profile=profile,
+            session_history=sessions,
+            current_engagement=request.current_engagement,
+            caregiver_goals=request.caregiver_goals or [],
+            time_of_day=request.time_of_day or "",
+            session_duration=request.session_duration or 0
+        )
+
+        logger.info(f"Music recommendation generated for child {request.child_id}: {recommendation['recommended_style']}")
+
+        return {
+            "status": "success",
+            "recommendation": recommendation,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate music recommendation: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommendation: {str(e)}")
+
+@router.post("/feedback")
+async def submit_music_feedback(
+    feedback: MusicFeedbackRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Submit caregiver feedback on music effectiveness.
+
+    This feedback is used to improve future recommendations by the LLM.
+    The system learns what music works well for each child over time.
+    """
+    try:
+        user_id = auth_service.get_current_user_id(credentials)
+
+        # Verify child profile exists and user has access
+        profile = await azure_storage.get_child_profile(user_id, feedback.child_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Child profile not found")
+
+        if profile.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get the session
+        session = await azure_storage.get_session(feedback.child_id, feedback.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Add music feedback to session
+        if "music_feedback" not in session:
+            session["music_feedback"] = {}
+
+        session["music_feedback"] = {
+            "effectiveness": feedback.effectiveness,
+            "notes": feedback.notes,
+            "outcome_notes": feedback.outcome_notes,
+            "music_style": feedback.music_style,
+            "tempo": feedback.tempo,
+            "submitted_at": datetime.now().isoformat()
+        }
+
+        # Save the updated session
+        await azure_storage.save_session(feedback.child_id, feedback.session_id, session)
+
+        logger.info(f"Music feedback recorded for session {feedback.session_id}: {feedback.effectiveness}")
+
+        return {
+            "status": "success",
+            "message": "Feedback recorded successfully",
+            "feedback_id": f"{feedback.session_id}_feedback",
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to submit music feedback: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to submit feedback: {str(e)}")
+
+@router.get("/feedback/history/{child_id}")
+async def get_music_feedback_history(
+    child_id: str,
+    limit: int = 20,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Get history of music feedback for a specific child.
+
+    Shows what music has been effective or ineffective over time.
+    """
+    try:
+        user_id = auth_service.get_current_user_id(credentials)
+
+        # Verify access
+        profile = await azure_storage.get_child_profile(user_id, child_id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Child profile not found")
+
+        if profile.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Get sessions with feedback
+        sessions = await azure_storage.list_child_sessions(child_id)
+
+        # Extract feedback data
+        feedback_history = []
+        for session in sessions:
+            if "music_feedback" in session and session["music_feedback"]:
+                feedback_history.append({
+                    "session_id": session.get("id"),
+                    "session_date": session.get("start_time"),
+                    "music_style": session["music_feedback"].get("music_style"),
+                    "tempo": session["music_feedback"].get("tempo"),
+                    "effectiveness": session["music_feedback"].get("effectiveness"),
+                    "notes": session["music_feedback"].get("notes"),
+                    "outcome_notes": session["music_feedback"].get("outcome_notes"),
+                    "submitted_at": session["music_feedback"].get("submitted_at")
+                })
+
+        # Sort by date descending and limit
+        feedback_history.sort(key=lambda x: x.get("session_date", ""), reverse=True)
+        feedback_history = feedback_history[:limit]
+
+        return {
+            "child_id": child_id,
+            "child_name": profile["demographics"]["name"],
+            "feedback_history": feedback_history,
+            "total_feedback": len(feedback_history)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get feedback history: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get feedback history: {str(e)}")
 
 # Helper function
 def generate_fallback_tone(style: str, volume: float):

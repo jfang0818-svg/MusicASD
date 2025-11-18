@@ -103,6 +103,9 @@ class AuthService:
     async def send_verification_code(email: str, azure_storage, email_service) -> str:
         """Send verification code to email"""
         try:
+            # Normalize email to lowercase
+            email = email.lower()
+
             # Check if email already exists
             existing_user = await azure_storage.get_user_by_email(email)
             if existing_user:
@@ -145,6 +148,9 @@ class AuthService:
     @staticmethod
     async def verify_code(email: str, code: str, azure_storage) -> bool:
         """Verify the code"""
+        # Normalize email to lowercase
+        email = email.lower()
+
         verification = await azure_storage.get_verification_code(email)
 
         if not verification:
@@ -190,6 +196,9 @@ class AuthService:
         is_caregiver: bool = False
     ) -> Dict[str, Any]:
         """Register new user"""
+        # Normalize email to lowercase
+        email = email.lower()
+
         # Check if already exists
         existing_user = await azure_storage.get_user_by_email(email)
         if existing_user:
@@ -231,6 +240,9 @@ class AuthService:
     @staticmethod
     async def login(email: str, password: str, azure_storage) -> Dict[str, Any]:
         """Login user with account lockout"""
+        # Normalize email to lowercase
+        email = email.lower()
+
         user = await azure_storage.get_user_by_email(email)
 
         if not user:
@@ -285,6 +297,9 @@ class AuthService:
     @staticmethod
     async def request_password_reset(email: str, azure_storage, email_service) -> None:
         """Request password reset"""
+        # Normalize email to lowercase
+        email = email.lower()
+
         user = await azure_storage.get_user_by_email(email)
 
         if user:
