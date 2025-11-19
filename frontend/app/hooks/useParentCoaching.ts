@@ -6,7 +6,7 @@
  * their child's engagement and therapeutic progress.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 export type CoachingPromptType =
   | 'technique'      // Musical technique to try
@@ -57,7 +57,10 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
   const { enabled, analysis, currentPhase, musicStyle, engagement, goalCategories = [] } = options;
 
   const [prompts, setPrompts] = useState<CoachingPrompt[]>([]);
-  const [lastAnalysisTime, setLastAnalysisTime] = useState(0);
+  const lastAnalysisTimeRef = useRef(0);
+
+  // Memoize goalCategories to prevent unnecessary re-renders
+  const memoizedGoalCategories = useMemo(() => goalCategories, [JSON.stringify(goalCategories)]);
 
   // Generate coaching prompts based on context
   const generatePrompts = useCallback(() => {
@@ -179,7 +182,7 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
     }
 
     // === GOAL-BASED PROMPTS ===
-    if (goalCategories.includes('communication')) {
+    if (memoizedGoalCategories.includes('communication')) {
       newPrompts.push({
         id: `goal-communication-${now}`,
         type: 'goal',
@@ -192,7 +195,7 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
       });
     }
 
-    if (goalCategories.includes('joint_attention')) {
+    if (memoizedGoalCategories.includes('joint_attention')) {
       newPrompts.push({
         id: `goal-joint-attention-${now}`,
         type: 'goal',
@@ -205,7 +208,7 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
       });
     }
 
-    if (goalCategories.includes('social_skills')) {
+    if (memoizedGoalCategories.includes('social_skills')) {
       newPrompts.push({
         id: `goal-social-${now}`,
         type: 'goal',
@@ -261,19 +264,20 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
     }, [] as CoachingPrompt[]);
 
     return uniquePrompts.slice(0, 3);  // Limit to 3 prompts to avoid overwhelming
-  }, [enabled, analysis, currentPhase, musicStyle, engagement, goalCategories]);
+  }, [enabled, analysis, currentPhase, musicStyle, engagement, memoizedGoalCategories]);
 
   // Update prompts when context changes
   useEffect(() => {
     if (!enabled) {
-      setPrompts([]);
+      // Only update if prompts is not already empty
+      setPrompts(prev => prev.length > 0 ? [] : prev);
       return;
     }
 
     const now = Date.now();
 
     // Only regenerate prompts every 10 seconds to avoid spam
-    if (now - lastAnalysisTime < 10000) {
+    if (now - lastAnalysisTimeRef.current < 10000) {
       return;
     }
 
@@ -294,8 +298,8 @@ export function useParentCoaching(options: UseParentCoachingOptions) {
       return merged.slice(0, 3);  // Keep max 3 prompts
     });
 
-    setLastAnalysisTime(now);
-  }, [enabled, analysis, currentPhase, musicStyle, engagement, goalCategories, generatePrompts, lastAnalysisTime]);
+    lastAnalysisTimeRef.current = now;
+  }, [enabled, generatePrompts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dismiss a prompt
   const dismissPrompt = useCallback((promptId: string) => {

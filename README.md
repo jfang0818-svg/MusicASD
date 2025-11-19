@@ -1,4 +1,4 @@
-# musicASD - AI-Powered Music Therapy Platform
+# SonicSoothe - AI-Powered Music Therapy Platform
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.0.3-black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.0.0-blue)](https://reactjs.org/)
@@ -132,7 +132,7 @@ An AI-powered music therapy platform designed to support children with Autism Sp
 ### Project Structure
 
 ```
-musicASD/
+SonicSoothe/
 ├── frontend/                 # Next.js 16 application
 │   ├── app/                 # Next.js app directory
 │   │   ├── (auth)/         # Authentication pages
@@ -197,7 +197,7 @@ musicASD/
 1. **Clone the repository**
 ```bash
 git clone <repository-url>
-cd musicASD
+cd SonicSoothe
 ```
 
 2. **Set up environment variables** (see [Environment Setup](#-environment-setup))
@@ -229,7 +229,7 @@ SMTP_PORT=587
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password
 SMTP_FROM=your_email@gmail.com
-SMTP_FROM_NAME=musicASD Platform
+SMTP_FROM_NAME=SonicSoothe Platform
 
 # Application
 ENVIRONMENT=development
@@ -538,7 +538,7 @@ pip freeze > requirements.txt
 
 ## 🔬 Research Background
 
-musicASD is based on research in music therapy for autism spectrum disorder. The platform implements evidence-based approaches including:
+SonicSoothe is based on research in music therapy for autism spectrum disorder. The platform implements evidence-based approaches including:
 
 - **Music-based interventions** for social and communication skills
 - **Real-time engagement monitoring** for adaptive therapy

@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: response.email,
         name: response.name,
       });
-      toast.success(`Welcome to musicASD, ${response.name}! 🎵`);
+      toast.success(`Welcome to SonicSoothe, ${response.name}! 🎵`);
       router.push('/dashboard');
     } catch (error: any) {
       const message = error.response?.data?.detail || 'Registration failed';

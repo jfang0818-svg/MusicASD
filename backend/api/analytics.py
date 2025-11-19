@@ -137,17 +137,78 @@ async def get_dashboard_analytics(
         }
 
 @router.get("/analytics/sessions/{session_id}")
-def get_session_analytics(session_id: str):
-    """Get analytics for a specific session"""
-    state = get_state()
+async def get_session_analytics(
+    session_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get analytics for a specific session from Azure Blob Storage"""
+    user_id = auth_service.get_current_user_id(credentials)
 
-    # Find session in history
-    session = next((s for s in state.sessions_history if s["session_id"] == session_id), None)
+    try:
+        # Get all user sessions and find the matching one
+        all_sessions = await azure_storage.list_user_sessions(user_id, limit=1000)
 
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        # Debug logging
+        logger.info(f"Looking for session_id: {session_id}")
+        logger.info(f"Found {len(all_sessions)} sessions for user")
+        if all_sessions:
+            logger.info(f"Sample session keys: {list(all_sessions[0].keys())}")
+            logger.info(f"Sample session id field: {all_sessions[0].get('id')}")
 
-    return session
+        session = next((s for s in all_sessions if s.get("id") == session_id), None)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Session belongs to user (already filtered by list_user_sessions)
+
+        # Calculate analytics from session data
+        logs = session.get("logs", [])
+        engagement_scores = {"LOW": 30, "MED": 60, "HIGH": 90}
+
+        # Engagement breakdown
+        engagement_counts = {"LOW": 0, "MED": 0, "HIGH": 0}
+        for log in logs:
+            eng = log.get("engagement")
+            if eng in engagement_counts:
+                engagement_counts[eng] += 1
+
+        # Music usage
+        music_usage = {}
+        for log in logs:
+            if log.get("music_style"):
+                style = log["music_style"]
+                music_usage[style] = music_usage.get(style, 0) + 1
+
+        # Events breakdown
+        events = {}
+        for log in logs:
+            event = log.get("event", "Unknown")
+            events[event] = events.get(event, 0) + 1
+
+        return {
+            "session_id": session_id,
+            "child_id": session.get("child_id"),
+            "child_name": session.get("child_name"),
+            "start_time": session.get("start_time"),
+            "end_time": session.get("end_time"),
+            "duration_seconds": session.get("duration_seconds", 0),
+            "status": session.get("status"),
+            "total_logs": len(logs),
+            "engagement_breakdown": engagement_counts,
+            "music_usage": music_usage,
+            "events_breakdown": events,
+            "logs": logs
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get session analytics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve session analytics"
+        )
 
 @router.get("/analytics/export")
 async def export_analytics(

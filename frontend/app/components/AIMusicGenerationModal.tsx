@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Music, Clock, TrendingUp, Key, Palette, Layers, Play, Download } from 'lucide-react';
+import { X, Sparkles, Music, Clock, TrendingUp, Key, Palette, Layers, Play, Download, Pause, Trash2, Edit2 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -22,6 +22,9 @@ export default function AIMusicGenerationModal({
   const [generating, setGenerating] = useState(false);
   const [generatedMusic, setGeneratedMusic] = useState<any | null>(null);
 
+  // Generation method
+  const [generationMethod, setGenerationMethod] = useState<'musicgen' | 'gpt-midi' | 'simple'>('musicgen');
+
   // Music parameters
   const [style, setStyle] = useState<'calm' | 'happy' | 'energetic'>('calm');
   const [duration, setDuration] = useState(60);
@@ -30,11 +33,49 @@ export default function AIMusicGenerationModal({
   const [mood, setMood] = useState('peaceful');
   const [complexity, setComplexity] = useState<'simple' | 'moderate' | 'complex'>('simple');
 
+  // Preview and rename features
+  const [customFilename, setCustomFilename] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
+  // Child personalization toggle
+  const [usePersonalization, setUsePersonalization] = useState(true);
+
   const keys = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'C#', 'D#', 'F#', 'G#', 'A#'];
   const moods = ['peaceful', 'joyful', 'energetic', 'calm', 'playful', 'soothing'];
 
+  // Set initial filename when music is generated
+  useEffect(() => {
+    if (generatedMusic?.filename) {
+      setCustomFilename(generatedMusic.filename.replace('.wav', ''));
+      setIsEditing(false);
+    }
+  }, [generatedMusic]);
+
+  // Cleanup audio when modal closes
+  useEffect(() => {
+    if (!isOpen && audioElement) {
+      audioElement.pause();
+      setAudioElement(null);
+      setIsPlaying(false);
+    }
+  }, [isOpen, audioElement]);
+
   const handleGenerate = async () => {
     setGenerating(true);
+
+    // Map generation method to backend parameters
+    const getGenerationParams = () => {
+      switch(generationMethod) {
+        case 'musicgen':
+          return { use_musicgen: true, use_ai: false };
+        case 'gpt-midi':
+          return { use_musicgen: false, use_ai: true };
+        case 'simple':
+          return { use_musicgen: false, use_ai: false };
+      }
+    };
 
     try {
       const response = await axios.post('http://localhost:8000/music/generate', {
@@ -42,8 +83,8 @@ export default function AIMusicGenerationModal({
         duration,
         tempo,
         key: musicalKey,
-        use_ai: true,
-        child_id: childId,
+        ...getGenerationParams(),
+        child_id: (usePersonalization && childId) ? childId : undefined,
         mood,
         complexity
       });
@@ -64,22 +105,58 @@ export default function AIMusicGenerationModal({
 
   const handlePlayPreview = () => {
     if (generatedMusic?.path) {
-      // TODO: Implement audio preview playback
-      toast('Preview playback not yet implemented', { icon: 'ℹ️' });
+      if (audioElement) {
+        // Toggle play/pause
+        if (isPlaying) {
+          audioElement.pause();
+          setIsPlaying(false);
+        } else {
+          audioElement.play();
+          setIsPlaying(true);
+        }
+      } else {
+        // Create new audio element
+        const audio = new Audio(`http://localhost:8000/${generatedMusic.path}`);
+        audio.onended = () => setIsPlaying(false);
+        audio.onerror = () => {
+          toast.error('Failed to load audio');
+          setIsPlaying(false);
+        };
+        audio.play();
+        setAudioElement(audio);
+        setIsPlaying(true);
+        toast.success('Playing preview...');
+      }
     }
   };
 
   const handleDownload = () => {
     if (generatedMusic?.path) {
-      // Create download link
+      // Create download link with custom filename
       const link = document.createElement('a');
       link.href = `http://localhost:8000/${generatedMusic.path}`;
-      link.download = generatedMusic.filename;
+      link.download = `${customFilename}.wav`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       toast.success('Download started!');
     }
+  };
+
+  const handleDelete = () => {
+    if (!generatedMusic) return;
+
+    // Stop and cleanup audio
+    if (audioElement) {
+      audioElement.pause();
+      setAudioElement(null);
+      setIsPlaying(false);
+    }
+
+    // Clear generated music state
+    setGeneratedMusic(null);
+    setCustomFilename('');
+    toast.success('Music deleted. You can generate a new one.');
   };
 
   if (!isOpen) return null;
@@ -108,11 +185,75 @@ export default function AIMusicGenerationModal({
                 <h2 className="text-2xl font-bold">AI Music Generation</h2>
               </div>
               <p className="text-white/90 text-sm">
-                Create personalized therapeutic music with GPT-4
+                Create personalized therapeutic music with AI
               </p>
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Generation Method Dropdown */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Generation Method
+                </label>
+                <select
+                  value={generationMethod}
+                  onChange={(e) => setGenerationMethod(e.target.value as any)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-gray-600 focus:border-purple-500 dark:focus:border-purple-400 focus:ring-4 focus:ring-purple-100 dark:focus:ring-purple-900/30 transition-all outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-medium"
+                >
+                  <option value="musicgen">🎵 AI Music (MusicGen) - Recommended</option>
+                  <option value="gpt-midi">🎹 AI Music (GPT + MIDI) - Experimental</option>
+                  <option value="simple">🔊 Simple Tones - Fast</option>
+                </select>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {generationMethod === 'musicgen' && '✨ High quality AI-generated music, personalized to child profile'}
+                  {generationMethod === 'gpt-midi' && '🧪 GPT-4 generates MIDI composition, then synthesizes audio'}
+                  {generationMethod === 'simple' && '⚡ Quick sine wave generation for testing'}
+                </p>
+              </div>
+
+              {/* Child Personalization Toggle */}
+              {childId && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border-2 border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Personalization Mode
+                      </label>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {usePersonalization
+                          ? '🎯 Music will be tailored to child\'s sensory profile and preferences'
+                          : '🌐 Generic therapeutic music without child-specific personalization'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setUsePersonalization(!usePersonalization)}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                        usePersonalization ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      role="switch"
+                      aria-checked={usePersonalization}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform ${
+                          usePersonalization ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className={`font-semibold ${!usePersonalization ? 'text-blue-900 dark:text-blue-100' : 'text-blue-500 dark:text-blue-400'}`}>
+                      Generic
+                    </span>
+                    <div className="flex-1 h-px bg-blue-300 dark:bg-blue-700" />
+                    <span className={`font-semibold ${usePersonalization ? 'text-blue-900 dark:text-blue-100' : 'text-blue-500 dark:text-blue-400'}`}>
+                      Personalized
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Style Selection */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -253,16 +394,6 @@ export default function AIMusicGenerationModal({
                 </div>
               </div>
 
-              {/* Child Personalization */}
-              {childId && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-                  <p className="text-sm text-blue-900 dark:text-blue-100">
-                    <Sparkles className="h-4 w-4 inline mr-2" />
-                    Music will be personalized based on child's profile and preferences
-                  </p>
-                </div>
-              )}
-
               {/* Generated Music Preview */}
               {generatedMusic && (
                 <motion.div
@@ -274,38 +405,80 @@ export default function AIMusicGenerationModal({
                     <Music className="h-5 w-5" />
                     Music Generated Successfully!
                   </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm text-green-800 dark:text-green-200 mb-4">
-                    <div>
-                      <span className="opacity-70">Filename:</span>
-                      <p className="font-mono text-xs">{generatedMusic.filename}</p>
-                    </div>
-                    <div>
-                      <span className="opacity-70">Notes:</span>
-                      <p className="font-semibold">{generatedMusic.notes_count}</p>
-                    </div>
-                    <div>
-                      <span className="opacity-70">Synthesizer:</span>
-                      <p className="font-semibold capitalize">{generatedMusic.synthesizer}</p>
-                    </div>
-                    <div>
-                      <span className="opacity-70">AI Generated:</span>
-                      <p className="font-semibold">{generatedMusic.ai_generated ? 'Yes' : 'No'}</p>
+
+                  {/* Editable Filename */}
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold text-green-800 dark:text-green-200 mb-1.5 flex items-center gap-1.5">
+                      <Edit2 className="h-3 w-3" />
+                      Filename
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customFilename}
+                        onChange={(e) => setCustomFilename(e.target.value)}
+                        onFocus={() => setIsEditing(true)}
+                        onBlur={() => setIsEditing(false)}
+                        className="flex-1 px-3 py-2 rounded-lg border-2 border-green-300 dark:border-green-700 focus:border-green-500 dark:focus:border-green-400 focus:ring-2 focus:ring-green-100 dark:focus:ring-green-900/30 transition-all outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-mono text-sm"
+                        placeholder="Enter filename"
+                      />
+                      <span className="flex items-center text-green-800 dark:text-green-200 font-mono text-sm">.wav</span>
                     </div>
                   </div>
-                  <div className="flex gap-3">
+
+                  <div className="grid grid-cols-2 gap-3 text-sm text-green-800 dark:text-green-200 mb-4">
+                    <div>
+                      <span className="opacity-70">Duration:</span>
+                      <p className="font-semibold">{generatedMusic.duration}s</p>
+                    </div>
+                    <div>
+                      <span className="opacity-70">Style:</span>
+                      <p className="font-semibold capitalize">{generatedMusic.style}</p>
+                    </div>
+                    {generatedMusic.notes_count && (
+                      <div>
+                        <span className="opacity-70">Notes:</span>
+                        <p className="font-semibold">{generatedMusic.notes_count}</p>
+                      </div>
+                    )}
+                    {generatedMusic.model && (
+                      <div>
+                        <span className="opacity-70">Model:</span>
+                        <p className="font-semibold">{generatedMusic.model}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
                     <button
                       onClick={handlePlayPreview}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold"
                     >
-                      <Play className="h-4 w-4" />
-                      Preview
+                      {isPlaying ? (
+                        <>
+                          <Pause className="h-4 w-4" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4" />
+                          Play Preview
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={handleDownload}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-green-600 text-green-900 dark:text-green-100 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-green-600 text-green-900 dark:text-green-100 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition-colors font-semibold"
                     >
                       <Download className="h-4 w-4" />
                       Download
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold"
+                      title="Delete and regenerate"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </motion.div>
@@ -342,7 +515,9 @@ export default function AIMusicGenerationModal({
 
               {/* Info */}
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                Generation may take 10-30 seconds depending on duration and complexity
+                {generationMethod === 'musicgen' && 'First generation downloads model (~300MB), then takes 30-60s. Subsequent generations are faster.'}
+                {generationMethod === 'gpt-midi' && 'Generation may take 10-30 seconds depending on duration and complexity.'}
+                {generationMethod === 'simple' && 'Generation is instant (< 1 second).'}
               </p>
             </div>
           </motion.div>

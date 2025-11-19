@@ -228,12 +228,52 @@ class AzureStorageService:
 
         return sessions
 
+    async def delete_session(self, child_id: str, session_id: str) -> bool:
+        """Delete a single session"""
+        blob_path = f"sessions/child_{child_id}/session_{session_id}.json"
+        return await self._delete_blob(blob_path)
+
     async def delete_child_sessions(self, child_id: str) -> bool:
         """Delete all sessions for a child"""
         prefix = f"sessions/child_{child_id}/"
         async for blob in self.container_client.list_blobs(name_starts_with=prefix):
             await self._delete_blob(blob.name)
         return True
+
+    # Music Management
+    async def list_music_files(self, category: str = None) -> List[Dict[str, Any]]:
+        """List all music files, optionally filtered by category (calm/happy/energetic/generated)"""
+        music_files = []
+        prefix = f"music/{category}/" if category else "music/"
+
+        async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+            if blob.name.endswith(('.wav', '.mp3', '.ogg', '.m4a')):
+                # Extract category from path: music/{category}/{filename}
+                parts = blob.name.split('/')
+                file_category = parts[1] if len(parts) > 1 else "unknown"
+                filename = parts[-1]
+
+                music_files.append({
+                    "name": filename,
+                    "category": file_category,
+                    "blob_path": blob.name,
+                    "size": blob.size,
+                    "url": f"{self.container_client.url}/{blob.name}"
+                })
+
+        return music_files
+
+    async def upload_music_file(
+        self, category: str, filename: str, file_data: bytes, content_type: str = "audio/wav"
+    ) -> bool:
+        """Upload a music file to Azure"""
+        blob_path = f"music/{category}/{filename}"
+        return await self.upload_file(blob_path, file_data, content_type)
+
+    async def download_music_file(self, category: str, filename: str) -> Optional[bytes]:
+        """Download a music file from Azure"""
+        blob_path = f"music/{category}/{filename}"
+        return await self.download_file(blob_path)
 
     # File Upload (Music files, recordings, etc.)
     async def upload_file(
@@ -242,8 +282,9 @@ class AzureStorageService:
         """Upload a file to blob storage"""
         try:
             blob_client = self.container_client.get_blob_client(blob_path)
+            content_settings = ContentSettings(content_type=content_type)
             await blob_client.upload_blob(
-                file_data, overwrite=True, content_settings={"content_type": content_type}
+                file_data, overwrite=True, content_settings=content_settings
             )
             return True
         except Exception as e:

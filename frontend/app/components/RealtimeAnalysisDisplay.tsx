@@ -119,7 +119,7 @@ export default function RealtimeAnalysisDisplay({
   const audioAnalysis = analysis?.audio_analysis;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 space-y-6">
+    <div className="fixed top-4 right-4 w-96 max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 space-y-6 z-40 border-2 border-purple-300 dark:border-purple-700">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">

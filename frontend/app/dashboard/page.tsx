@@ -39,7 +39,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  musicASD
+                  SonicSoothe
                 </h1>
                 <p className="text-xs text-gray-500">Music Therapy for ASD</p>
               </div>
@@ -202,7 +202,7 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-2xl font-bold text-gray-800 mb-3">No profiles yet</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Create your first child profile to start using musicASD for therapy sessions
+              Create your first child profile to start using SonicSoothe for therapy sessions
             </p>
             <Link
               href="/dashboard/profiles/new"

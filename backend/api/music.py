@@ -13,11 +13,13 @@ import scipy.io.wavfile as wavfile
 import pygame
 import time
 import logging
+import asyncio
 from services.gpt_client import gpt_client
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
 from services.midi_generator import midi_generator
 from services.audio_synthesizer import audio_synthesizer
+from services.musicgen_service import musicgen_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/music", tags=["music"])
@@ -35,7 +37,9 @@ class GenerateMusicRequest(BaseModel):
     tempo: int = 120
     key: str = "C"
     use_ai: bool = False  # Use AI (GPT-4 + MIDI) vs rule-based generation
+    use_musicgen: bool = False  # Use MusicGen for generation (overrides use_ai)
     child_id: Optional[str] = None  # For AI personalization
+    user_id: Optional[str] = None  # For loading child profile
     mood: str = "peaceful"
     complexity: str = "simple"  # simple, moderate, complex
 
@@ -65,8 +69,16 @@ def play_music(request: MusicRequest):
         else:
             music_file = random.choice(music_files)
 
-        logger.info(f"Playing: {music_file['name']} from {music_file['path']}")
-        pygame.mixer.music.load(music_file["path"])
+        # Ensure music file is cached locally (download from Azure if needed)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            cached_path = loop.run_until_complete(state.ensure_music_cached(music_file))
+        finally:
+            loop.close()
+
+        logger.info(f"Playing: {music_file['name']} from {cached_path}")
+        pygame.mixer.music.load(cached_path)
         pygame.mixer.music.set_volume(request.volume)
         pygame.mixer.music.play()
 
@@ -176,23 +188,38 @@ def get_music_library():
 
 @router.post("/upload/{style}")
 async def upload_music(style: str, file: UploadFile = File(...)):
-    """Upload new music file to library"""
+    """Upload new music file to Azure Blob Storage"""
     from services.redis_client import redis_client
     state = get_state()
 
-    if style not in ["calm", "happy", "energetic"]:
+    if style not in ["calm", "happy", "energetic", "generated"]:
         raise HTTPException(status_code=400, detail="Invalid style")
 
     try:
-        # Save to the parent assets folder
-        file_path = Path(f"../assets/music/{style}") / file.filename
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-
+        # Read file content
         content = await file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
 
-        # Rescan library
+        # Determine content type
+        content_type = "audio/wav"
+        if file.filename.endswith(".mp3"):
+            content_type = "audio/mpeg"
+        elif file.filename.endswith(".ogg"):
+            content_type = "audio/ogg"
+        elif file.filename.endswith(".m4a"):
+            content_type = "audio/mp4"
+
+        # Upload to Azure
+        success = await azure_storage.upload_music_file(
+            category=style,
+            filename=file.filename,
+            file_data=content,
+            content_type=content_type
+        )
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to upload to Azure")
+
+        # Rescan library to include new file
         state.scan_music_library()
 
         # Invalidate cache
@@ -200,23 +227,97 @@ async def upload_music(style: str, file: UploadFile = File(...)):
             redis_client.delete("music:library")
             logger.debug("Music library cache invalidated after upload")
 
-        logger.info(f"Uploaded {file.filename} to {style}")
+        logger.info(f"Uploaded {file.filename} to Azure ({style} category)")
         return {
             "status": "success",
             "file": file.filename,
             "style": style,
-            "path": str(file_path)
+            "size": len(content),
+            "uploaded_to": "Azure Blob Storage"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate")
 async def generate_music(request: GenerateMusicRequest):
-    """Generate synthetic music/tones or AI-generated MIDI music"""
+    """Generate synthetic music/tones, AI-generated MIDI music, or MusicGen music"""
     state = get_state()
 
     try:
+        # MusicGen - Priority option (overrides use_ai)
+        if request.use_musicgen:
+            # Get child context if provided
+            child_context = None
+            if request.child_id and request.user_id:
+                try:
+                    child_profile = await azure_storage.get_child_profile(
+                        request.user_id, request.child_id
+                    )
+                    child_context = child_profile
+                except Exception as e:
+                    logger.warning(f"Could not load child profile: {e}")
+                    child_context = {"child_id": request.child_id}
+
+            # Generate music with MusicGen
+            musicgen_result = await musicgen_service.generate(
+                style=request.style,
+                duration=request.duration,
+                mood=request.mood,
+                complexity=request.complexity,
+                child_context=child_context,
+                filename=request.filename
+            )
+
+            # Read generated file
+            with open(musicgen_result["file_path"], 'rb') as f:
+                wav_data = f.read()
+
+            # Upload to Azure
+            timestamp = musicgen_result["timestamp"]
+            final_filename = f"musicgen_{request.filename}_{request.style}_{timestamp}.wav"
+
+            await azure_storage.upload_music_file(
+                category="generated",
+                filename=final_filename,
+                file_data=wav_data,
+                content_type="audio/wav"
+            )
+
+            # Rescan library
+            state.scan_music_library()
+
+            # Save metadata
+            tone_info = {
+                "name": final_filename,
+                "style": request.style,
+                "duration": request.duration,
+                "mood": request.mood,
+                "complexity": request.complexity,
+                "model": musicgen_result["model"],
+                "prompt": musicgen_result["prompt"],
+                "musicgen_generated": True,
+                "created": datetime.now().isoformat()
+            }
+            state.generated_tones.append(tone_info)
+
+            logger.info(f"Generated MusicGen music: {final_filename}")
+            return {
+                "status": "success",
+                "filename": final_filename,
+                "style": request.style,
+                "duration": request.duration,
+                "mood": request.mood,
+                "complexity": request.complexity,
+                "model": musicgen_result["model"],
+                "prompt": musicgen_result["prompt"],
+                "sample_rate": musicgen_result["sample_rate"],
+                "musicgen_generated": True,
+                "storage": "Azure Blob Storage"
+            }
+
         # AI-generated MIDI music
         if request.use_ai:
             # Check if synthesizer is available
@@ -252,16 +353,23 @@ async def generate_music(request: GenerateMusicRequest):
             # Convert MIDI to WAV
             audio_result = await audio_synthesizer.synthesize(midi_result["file_path"])
 
-            # Copy to standard music directory
+            # Prepare filename and upload to Azure
             timestamp = int(time.time())
             final_filename = f"ai_{request.filename}_{request.style}_{timestamp}.wav"
-            final_path = Path(f"assets/music/generated") / final_filename
-            final_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Copy the synthesized audio
-            import shutil
-            shutil.copy(audio_result["wav_path"], str(final_path))
+            # Read the synthesized WAV file
+            with open(audio_result["wav_path"], 'rb') as f:
+                wav_data = f.read()
 
+            # Upload to Azure
+            await azure_storage.upload_music_file(
+                category="generated",
+                filename=final_filename,
+                file_data=wav_data,
+                content_type="audio/wav"
+            )
+
+            # Rescan library to include new file
             state.scan_music_library()
 
             tone_info = {
@@ -279,7 +387,7 @@ async def generate_music(request: GenerateMusicRequest):
             }
             state.generated_tones.append(tone_info)
 
-            logger.info(f"Generated AI music: {final_filename}")
+            logger.info(f"Generated AI music: {final_filename} (uploaded to Azure)")
             return {
                 "status": "success",
                 "filename": final_filename,
@@ -292,7 +400,7 @@ async def generate_music(request: GenerateMusicRequest):
                 "ai_generated": True,
                 "notes_count": midi_result["notes_count"],
                 "synthesizer": audio_result["synthesizer"],
-                "path": str(final_path)
+                "storage": "Azure Blob Storage"
             }
 
         # Traditional wave generation (original code)
@@ -339,11 +447,26 @@ async def generate_music(request: GenerateMusicRequest):
 
             timestamp = int(time.time())
             filename = f"{request.filename}_{request.style}_{timestamp}.wav"
-            filepath = Path(f"assets/music/generated") / filename
-            filepath.parent.mkdir(parents=True, exist_ok=True)
 
-            wavfile.write(str(filepath), sample_rate, wave)
+            # Write to temporary file first
+            temp_path = Path(f"temp_{filename}")
+            wavfile.write(str(temp_path), sample_rate, wave)
 
+            # Upload to Azure
+            with open(temp_path, 'rb') as f:
+                wav_data = f.read()
+
+            await azure_storage.upload_music_file(
+                category="generated",
+                filename=filename,
+                file_data=wav_data,
+                content_type="audio/wav"
+            )
+
+            # Clean up temp file
+            temp_path.unlink()
+
+            # Rescan library to include new file
             state.scan_music_library()
 
             tone_info = {
@@ -356,7 +479,7 @@ async def generate_music(request: GenerateMusicRequest):
             }
             state.generated_tones.append(tone_info)
 
-            logger.info(f"Generated tone: {filename}")
+            logger.info(f"Generated tone: {filename} (uploaded to Azure)")
             return {
                 "status": "success",
                 "filename": filename,
@@ -364,7 +487,7 @@ async def generate_music(request: GenerateMusicRequest):
                 "duration": request.duration,
                 "tempo": request.tempo,
                 "key": request.key,
-                "path": str(filepath)
+                "storage": "Azure Blob Storage"
             }
     except Exception as e:
         logger.error(f"Generation failed: {e}")

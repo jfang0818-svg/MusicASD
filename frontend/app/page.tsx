@@ -59,7 +59,7 @@ export default function HomePage() {
               <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center shadow-lg">
                 <span className="text-xl">🎵</span>
               </div>
-              <span className="text-xl font-bold text-white">musicASD</span>
+              <span className="text-xl font-bold text-white">SonicSoothe</span>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, x: 20 }}

@@ -190,8 +190,12 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getSessionAnalytics(sessionId: string) {
-  const { data } = await apiClient.get(`/analytics/session/${sessionId}`);
+  const { data } = await apiClient.get(`/api/v1/analytics/sessions/${sessionId}`);
   return data;
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await apiClient.delete(`/session/sessions/${sessionId}`);
 }
 
 // MCP Server Communication
@@ -645,5 +649,282 @@ export async function deleteSessionNote(noteId: string) {
 
 export async function getSessionNotesSummary(sessionId: string) {
   const response = await apiClient.get(`/session-notes/session/${sessionId}/summary`);
+  return response.data;
+}
+
+// ==================== CHILD ANALYTICS API ====================
+
+export async function getChildProgressSummary(childId: string, days = 30) {
+  const response = await apiClient.get(`/child-analytics/${childId}/progress-summary?days=${days}`);
+  return response.data;
+}
+
+export async function getGoalProgressTimeline(childId: string, goalId?: string, days = 30) {
+  const params = new URLSearchParams();
+  params.append('days', days.toString());
+  if (goalId) params.append('goal_id', goalId);
+
+  const response = await apiClient.get(`/child-analytics/${childId}/goal-progress-timeline?${params.toString()}`);
+  return response.data;
+}
+
+export async function getSessionInsights(childId: string, days = 30) {
+  const response = await apiClient.get(`/child-analytics/${childId}/session-insights?days=${days}`);
+  return response.data;
+}
+
+// ==================== HOME ROUTINES API ====================
+
+export async function getRoutineTemplates() {
+  const response = await apiClient.get('/home-routines/templates');
+  return response.data;
+}
+
+export async function createHomeRoutine(data: {
+  child_id: string;
+  name: string;
+  routine_type: string;
+  time_of_day: string;
+  description: string;
+  music_style: string;
+  duration_minutes: number;
+  scheduled_time?: string;
+  days_of_week?: string[];
+  icon?: string;
+  color?: string;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/home-routines/create', data);
+  return response.data;
+}
+
+export async function getChildRoutines(childId: string, activeOnly = true) {
+  const response = await apiClient.get(`/home-routines/child/${childId}?active_only=${activeOnly}`);
+  return response.data;
+}
+
+export async function updateHomeRoutine(routineId: string, data: {
+  name?: string;
+  description?: string;
+  music_style?: string;
+  duration_minutes?: number;
+  scheduled_time?: string;
+  days_of_week?: string[];
+  active?: boolean;
+  notes?: string;
+}) {
+  const response = await apiClient.put(`/home-routines/${routineId}`, data);
+  return response.data;
+}
+
+export async function deleteHomeRoutine(routineId: string) {
+  const response = await apiClient.delete(`/home-routines/${routineId}`);
+  return response.data;
+}
+
+export async function createPlaylist(data: {
+  child_id: string;
+  name: string;
+  description: string;
+  music_style: string;
+  session_id?: string;
+}) {
+  const response = await apiClient.post('/home-routines/playlist/create', data);
+  return response.data;
+}
+
+export async function getChildPlaylists(childId: string) {
+  const response = await apiClient.get(`/home-routines/playlist/child/${childId}`);
+  return response.data;
+}
+
+export async function getDailySchedule(childId: string) {
+  const response = await apiClient.get(`/home-routines/child/${childId}/daily-schedule`);
+  return response.data;
+}
+
+// ==================== Interactive Activities API ====================
+
+export async function getActivityTemplates() {
+  const response = await apiClient.get('/activities/templates');
+  return response.data;
+}
+
+export async function startActivity(data: {
+  session_id: string;
+  child_id: string;
+  activity_type: string;
+  participants: string[];
+}) {
+  const response = await apiClient.post('/activities/start', data);
+  return response.data;
+}
+
+export async function getActivitySession(activitySessionId: string) {
+  const response = await apiClient.get(`/activities/${activitySessionId}`);
+  return response.data;
+}
+
+export async function recordTurn(data: {
+  activity_session_id: string;
+  participant_name: string;
+  turn_status: string;
+  engagement_level?: string;
+  completed_successfully?: boolean;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/turn/record', data);
+  return response.data;
+}
+
+export async function getActivityTurns(activitySessionId: string) {
+  const response = await apiClient.get(`/activities/turns/${activitySessionId}`);
+  return response.data;
+}
+
+export async function completeActivity(data: {
+  activity_session_id: string;
+  engagement_rating: number;
+  therapist_notes?: string;
+}) {
+  const response = await apiClient.put('/activities/complete', data);
+  return response.data;
+}
+
+export async function getSessionActivities(sessionId: string) {
+  const response = await apiClient.get(`/activities/session/${sessionId}/all`);
+  return response.data;
+}
+
+export async function getChildActivityHistory(childId: string, limit = 20) {
+  const response = await apiClient.get(`/activities/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+// ==================== Session Videos API ====================
+
+export async function createVideo(data: {
+  session_id: string;
+  child_id: string;
+  title: string;
+  recorded_by: string;
+  session_phase?: string;
+  music_style?: string;
+  notes?: string;
+  privacy?: string;
+}) {
+  const response = await apiClient.post('/videos/create', data);
+  return response.data;
+}
+
+export async function getVideo(videoId: string) {
+  const response = await apiClient.get(`/videos/${videoId}`);
+  return response.data;
+}
+
+export async function updateVideo(videoId: string, data: {
+  title?: string;
+  notes?: string;
+  privacy?: string;
+  tags?: string[];
+  status?: string;
+  duration_seconds?: number;
+  file_size_mb?: number;
+  blob_url?: string;
+  thumbnail_url?: string;
+}) {
+  const response = await apiClient.put(`/videos/${videoId}`, data);
+  return response.data;
+}
+
+export async function listSessionVideos(sessionId: string) {
+  const response = await apiClient.get(`/videos/session/${sessionId}/list`);
+  return response.data;
+}
+
+export async function listChildVideos(childId: string, limit = 20) {
+  const response = await apiClient.get(`/videos/child/${childId}/list?limit=${limit}`);
+  return response.data;
+}
+
+export async function deleteVideo(videoId: string) {
+  const response = await apiClient.delete(`/videos/${videoId}`);
+  return response.data;
+}
+
+export async function createVideoClip(data: {
+  video_id: string;
+  title: string;
+  start_time_seconds: number;
+  end_time_seconds: number;
+  description: string;
+  clip_type: string;
+  privacy?: string;
+}) {
+  const response = await apiClient.post('/videos/clips/create', data);
+  return response.data;
+}
+
+export async function listVideoClips(videoId: string) {
+  const response = await apiClient.get(`/videos/clips/video/${videoId}`);
+  return response.data;
+}
+
+export async function shareVideo(data: {
+  video_id: string;
+  shared_with_email: string;
+  shared_with_name: string;
+  share_message?: string;
+  expires_days?: number;
+}) {
+  const response = await apiClient.post('/videos/share', data);
+  return response.data;
+}
+
+// ==================== Gamification API ====================
+
+export async function getAllAchievements() {
+  const response = await apiClient.get('/gamification/achievements');
+  return response.data;
+}
+
+export async function getChildProgress(childId: string) {
+  const response = await apiClient.get(`/gamification/child/${childId}/progress`);
+  return response.data;
+}
+
+export async function updateChildProgress(data: {
+  child_id: string;
+  sessions_increment?: number;
+  activities_increment?: number;
+  goals_increment?: number;
+  update_streak?: boolean;
+}) {
+  const response = await apiClient.put(`/gamification/child/${data.child_id}/progress`, data);
+  return response.data;
+}
+
+export async function unlockAchievement(data: {
+  child_id: string;
+  achievement_id: string;
+  session_id?: string;
+  unlocked_by?: string;
+}) {
+  const response = await apiClient.post('/gamification/unlock', data);
+  return response.data;
+}
+
+export async function getUnlockedAchievements(childId: string) {
+  const response = await apiClient.get(`/gamification/child/${childId}/unlocked`);
+  return response.data;
+}
+
+export async function getNewAchievements(childId: string) {
+  const response = await apiClient.get(`/gamification/child/${childId}/new-achievements`);
+  return response.data;
+}
+
+export async function markAchievementSeen(unlockId: string, childId: string) {
+  const response = await apiClient.put(`/gamification/achievement/${unlockId}/mark-seen?child_id=${childId}`);
   return response.data;
 }

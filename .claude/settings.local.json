@@ -39,7 +39,9 @@
       "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -m pip install setuptools)",
       "Bash(=65.0.0)",
       "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c \"import pkg_resources; print(''pkg_resources OK'')\")",
-      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c \"import librosa; import speech_recognition; print(''Audio libraries OK'')\")"
+      "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c \"import librosa; import speech_recognition; print(''Audio libraries OK'')\")",
+      "Bash(../.venv/Scripts/python.exe main.py)",
+      "Bash(../.venv/Scripts/python.exe:*)"
     ],
     "deny": [],
     "ask": []

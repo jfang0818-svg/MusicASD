@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type RegistrationStep = 'email' | 'verify' | 'complete';
+type UserType = 'parent' | 'therapist' | 'personal';
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const [step, setStep] = useState<RegistrationStep>('email');
   const [email, setEmail] = useState('');
-  const [isCaregiver, setIsCaregiver] = useState(false);
+  const [userType, setUserType] = useState<UserType>('parent');
   const [verificationCode, setVerificationCode] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -41,7 +42,10 @@ export default function RegisterPage() {
       const response = await fetch('http://localhost:8000/auth/send-verification-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, is_caregiver: isCaregiver }),
+        body: JSON.stringify({
+          email,
+          is_caregiver: userType === 'parent' || userType === 'therapist'
+        }),
       });
 
       if (!response.ok) {
@@ -124,7 +128,10 @@ export default function RegisterPage() {
       const response = await fetch('http://localhost:8000/auth/send-verification-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, is_caregiver: isCaregiver }),
+        body: JSON.stringify({
+          email,
+          is_caregiver: userType === 'parent' || userType === 'therapist'
+        }),
       });
 
       if (!response.ok) {
@@ -190,10 +197,10 @@ export default function RegisterPage() {
                 </div>
               </motion.div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-indigo-600 bg-clip-text text-transparent group-hover:from-cyan-500 group-hover:to-indigo-500 transition-all">
-                Join musicASD
+                Join SonicSoothe
               </h1>
             </Link>
-            <p className="text-gray-600 mt-2">Start your child's music therapy journey</p>
+            <p className="text-gray-600 mt-2">Start your music therapy journey</p>
 
             {/* Step Indicator */}
             <div className="flex justify-center gap-2 mt-4">
@@ -253,17 +260,95 @@ export default function RegisterPage() {
                   </p>
                 </div>
 
-                <div className="flex items-start">
-                  <input
-                    type="checkbox"
-                    id="is_caregiver"
-                    checked={isCaregiver}
-                    onChange={(e) => setIsCaregiver(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
-                  />
-                  <label htmlFor="is_caregiver" className="ml-2 block text-sm text-gray-700">
-                    I am a caregiver or therapist working with children with ASD
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    I'm registering as:
                   </label>
+                  <div className="space-y-2">
+                    {/* Parent/Guardian Option */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setUserType('parent')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                        userType === 'parent'
+                          ? 'border-cyan-500 bg-cyan-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start">
+                        <input
+                          type="radio"
+                          id="user_parent"
+                          checked={userType === 'parent'}
+                          onChange={() => setUserType('parent')}
+                          className="mt-0.5 h-4 w-4 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <label htmlFor="user_parent" className="ml-3 cursor-pointer flex-1">
+                          <p className="font-semibold text-gray-900">👨‍👩‍👧 Parent/Guardian</p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            I'm registering to support a child or family member
+                          </p>
+                        </label>
+                      </div>
+                    </motion.div>
+
+                    {/* Therapist Option */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setUserType('therapist')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                        userType === 'therapist'
+                          ? 'border-cyan-500 bg-cyan-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start">
+                        <input
+                          type="radio"
+                          id="user_therapist"
+                          checked={userType === 'therapist'}
+                          onChange={() => setUserType('therapist')}
+                          className="mt-0.5 h-4 w-4 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <label htmlFor="user_therapist" className="ml-3 cursor-pointer flex-1">
+                          <p className="font-semibold text-gray-900">🩺 Therapist/Professional</p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            I'm a healthcare professional working with clients
+                          </p>
+                        </label>
+                      </div>
+                    </motion.div>
+
+                    {/* Personal Use Option */}
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setUserType('personal')}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all ${
+                        userType === 'personal'
+                          ? 'border-cyan-500 bg-cyan-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-start">
+                        <input
+                          type="radio"
+                          id="user_personal"
+                          checked={userType === 'personal'}
+                          onChange={() => setUserType('personal')}
+                          className="mt-0.5 h-4 w-4 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <label htmlFor="user_personal" className="ml-3 cursor-pointer flex-1">
+                          <p className="font-semibold text-gray-900">🧘 Personal Use</p>
+                          <p className="text-xs text-gray-600 mt-0.5">
+                            I'm using this for my own music therapy and wellness
+                          </p>
+                        </label>
+                      </div>
+                    </motion.div>
+                  </div>
                 </div>
 
                 <motion.button
@@ -457,7 +542,7 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <p className="text-center mt-6 text-white/90 text-sm">
-          Empowering ASD therapy through music 🎵
+          Empowering wellness through music therapy 🎵
         </p>
       </motion.div>
     </div>

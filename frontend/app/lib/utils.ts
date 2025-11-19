@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import toast from 'react-hot-toast';
 
 /**
  * Combines class names using clsx and tailwind-merge
@@ -8,6 +9,16 @@ import { twMerge } from 'tailwind-merge';
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+/**
+ * Toast notification helper
+ */
+export const addToast = {
+  success: (message: string) => toast.success(message),
+  error: (message: string) => toast.error(message),
+  loading: (message: string) => toast.loading(message),
+  promise: toast.promise,
+};
 
 /**
  * Format duration from seconds to human-readable string

@@ -1,8 +1,0 @@
-timestamp,session_id,event,note,engagement,music_style,suggestion,caregiver_action,child_response
-2025-08-18T19:42:31.926982,session_1755570795,skip,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,skip,
-2025-08-18T19:42:32.687770,session_1755570795,skip,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,skip,
-2025-08-18T19:42:33.553147,session_1755570795,accept,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,accept,
-2025-08-18T19:42:42.730563,session_1755570795,response,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,response,
-2025-08-18T19:42:56.856947,session_1755570795,skip,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,skip,
-2025-08-18T19:42:57.787285,session_1755570795,accept,Session session_1755570795,LOW,calm,Let's listen to some gentle music together. It's okay to just relax.,accept,
-2025-08-18T19:43:02.287343,session_1755570795,accept,Session session_1755570795,HIGH,energetic,"Wow, you have so much energy! Let's move to this exciting beat!",accept,

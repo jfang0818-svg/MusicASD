@@ -165,7 +165,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center mt-6 text-white/90 text-sm">
-          Empowering ASD therapy through music 🎵
+          Empowering wellness through music therapy 🎵
         </p>
       </motion.div>
     </div>

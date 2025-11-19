@@ -14,7 +14,7 @@
  * - Calm + medium engagement → Maintain current music
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 interface AnalysisData {
   video_analysis?: {
@@ -62,7 +62,7 @@ export function useAdaptiveMusic(
   currentMusicStyle: 'calm' | 'happy' | 'energetic' | null,
   config: Partial<AdaptiveMusicConfig> = {}
 ) {
-  const fullConfig = { ...DEFAULT_CONFIG, ...config };
+  const fullConfig = useMemo(() => ({ ...DEFAULT_CONFIG, ...config }), [config]);
 
   const [recommendation, setRecommendation] = useState<AdaptiveMusicRecommendation | null>(null);
   const lastChangeTime = useRef<number>(0);
@@ -71,7 +71,9 @@ export function useAdaptiveMusic(
 
   useEffect(() => {
     if (!analysis || !fullConfig.enabled) {
-      setRecommendation(null);
+      if (recommendation !== null) {
+        setRecommendation(null);
+      }
       return;
     }
 
@@ -120,10 +122,10 @@ export function useAdaptiveMusic(
     if (rec.shouldChange) {
       setRecommendation(rec);
       lastChangeTime.current = now;
-    } else {
+    } else if (recommendation !== null) {
       setRecommendation(null);
     }
-  }, [analysis, currentMusicStyle, fullConfig]);
+  }, [analysis, currentMusicStyle, fullConfig]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const acceptRecommendation = () => {
     setRecommendation(null);

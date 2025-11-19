@@ -1,4 +1,4 @@
-# 🚀 Quick Start Guide - musicASD
+# 🚀 Quick Start Guide - SonicSoothe
 
 ## What's Been Built
 
@@ -66,7 +66,7 @@ python main.py
 
 You should see:
 ```
-🎵 musicASD MCP Server v2.0.0
+🎵 SonicSoothe MCP Server v2.0.0
 ✓ Azure Blob Storage initialized successfully
 Music Library Status:
   calm: 6 files

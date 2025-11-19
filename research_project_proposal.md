@@ -385,7 +385,7 @@ Scenario Input → GPT (Strategy A) → Musical Description → Music Generator 
 - Statistical analysis software (R/Python - free, or SPSS)
 
 **Existing Infrastructure:**
-- Current musicASD application (provides scenario framework)
+- Current SonicSoothe application (provides scenario framework)
 - FastAPI backend (can be extended for music generation)
 - Next.js frontend (can create expert rating interface)
 

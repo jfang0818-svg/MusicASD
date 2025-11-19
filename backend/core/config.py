@@ -13,7 +13,7 @@ class Settings:
     """Application settings"""
 
     # Application Info
-    APP_NAME: str = "musicASD MCP Server"
+    APP_NAME: str = "SonicSoothe MCP Server"
     APP_VERSION: str = "2.0.0"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
@@ -86,11 +86,11 @@ class Settings:
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "")
-    FROM_NAME: str = os.getenv("FROM_NAME", "musicASD")
+    FROM_NAME: str = os.getenv("FROM_NAME", "SonicSoothe")
 
     # Azure Blob Storage Configuration
     AZURE_STORAGE_CONNECTION_STRING: str = os.getenv("AZURE_STORAGE_CONNECTION_STRING", "")
-    AZURE_CONTAINER_NAME: str = os.getenv("AZURE_CONTAINER_NAME", "musicasd-container")
+    AZURE_CONTAINER_NAME: str = os.getenv("AZURE_CONTAINER_NAME", "sonicsoothe-container")
     AZURE_USE_EMULATOR: bool = os.getenv("AZURE_USE_EMULATOR", "false").lower() == "true"
 
     # Redis Configuration
@@ -103,10 +103,18 @@ class Settings:
     ENABLE_MUSIC_GENERATION: bool = os.getenv("ENABLE_MUSIC_GENERATION", "true").lower() == "true"
     ENABLE_FILE_UPLOAD: bool = os.getenv("ENABLE_FILE_UPLOAD", "true").lower() == "true"
     ENABLE_GPT_SUGGESTIONS: bool = os.getenv("ENABLE_GPT_SUGGESTIONS", "false").lower() == "true"
+    ENABLE_MUSICGEN: bool = os.getenv("ENABLE_MUSICGEN", "true").lower() == "true"
 
     # Limits
     MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "10485760"))  # 10MB
     MAX_GENERATED_DURATION: float = float(os.getenv("MAX_GENERATED_DURATION", "30.0"))  # seconds
+
+    # MusicGen Configuration
+    MUSICGEN_MODEL_SIZE: str = os.getenv("MUSICGEN_MODEL_SIZE", "small")  # small, medium, large, melody
+    MUSICGEN_DEVICE: str = os.getenv("MUSICGEN_DEVICE", "cpu")  # cpu or cuda
+    MUSICGEN_USE_SAMPLING: bool = os.getenv("MUSICGEN_USE_SAMPLING", "true").lower() == "true"
+    MUSICGEN_TOP_K: int = int(os.getenv("MUSICGEN_TOP_K", "250"))
+    MUSICGEN_TOP_P: float = float(os.getenv("MUSICGEN_TOP_P", "0.0"))
 
     def __init__(self):
         """Initialize and validate settings"""

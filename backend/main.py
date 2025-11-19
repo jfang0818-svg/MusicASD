@@ -17,7 +17,7 @@ from core.config import settings
 from core.state import SessionState
 
 # Import API routers
-from api import analytics, engagement, music, session, camera, health, auth, profile, websocket_analysis, goals, session_notes
+from api import analytics, engagement, music, session, camera, health, auth, profile, websocket_analysis, goals, session_notes, child_analytics, home_routines, notifications, interactive_activities, session_videos, gamification
 
 # Import services
 from services.azure_storage import azure_storage
@@ -70,6 +70,12 @@ app.include_router(auth.router)  # Authentication endpoints
 app.include_router(profile.router)  # Child profile management
 app.include_router(goals.router)  # Goal tracking
 app.include_router(session_notes.router)  # Session notes and observations
+app.include_router(child_analytics.router)  # Child progress analytics
+app.include_router(home_routines.router)  # Home routines and playlist export
+app.include_router(notifications.router)  # Notifications and parent communication
+app.include_router(interactive_activities.router)  # Turn-taking interactive activities
+app.include_router(session_videos.router)  # Video recording and playback
+app.include_router(gamification.router)  # Achievements and rewards
 app.include_router(analytics.router)
 app.include_router(engagement.router)
 app.include_router(music.router)
@@ -169,9 +175,9 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print(f"🎵 {settings.APP_NAME} v{settings.APP_VERSION}")
+    print(f"{settings.APP_NAME} v{settings.APP_VERSION}")
     print("=" * 60)
-    print("📁 Scanning for music files...")
+    print("Scanning for music files...")
 
     for style, files in state.music_library.items():
         print(f"   {style}: {len(files)} files")
@@ -181,10 +187,10 @@ if __name__ == "__main__":
             print(f"      ... and {len(files) - 3} more")
 
     print("=" * 60)
-    print(f"🌐 Server starting at http://localhost:{settings.PORT}")
-    print(f"📊 API docs at http://localhost:{settings.PORT}/docs")
-    print(f"💡 Frontend should connect to http://localhost:3000")
-    print(f"✅ Environment: {settings.ENVIRONMENT}")
+    print(f"Server starting at http://localhost:{settings.PORT}")
+    print(f"API docs at http://localhost:{settings.PORT}/docs")
+    print(f"Frontend should connect to http://localhost:3000")
+    print(f"Environment: {settings.ENVIRONMENT}")
     print("=" * 60)
 
     uvicorn.run(

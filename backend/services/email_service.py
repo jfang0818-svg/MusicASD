@@ -1,5 +1,5 @@
 """
-Email Service for musicASD
+Email Service for SonicSoothe
 Handles sending emails via SMTP with beautiful HTML templates
 """
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Email service for musicASD with Zoho SMTP support"""
+    """Email service for SonicSoothe with Zoho SMTP support"""
 
     def __init__(self):
         self.smtp_host = settings.SMTP_HOST
@@ -103,12 +103,12 @@ class EmailService:
         code: str,
         expires_in_minutes: int = 5
     ) -> Dict[str, Any]:
-        """Send verification code email with musicASD branding"""
+        """Send verification code email with SonicSoothe branding"""
 
-        subject = f"Your musicASD Verification Code: {code}"
+        subject = f"Your SonicSoothe Verification Code: {code}"
 
         plain_content = f"""
-Welcome to musicASD - Music Therapy, Reimagined!
+Welcome to SonicSoothe - Music Therapy, Reimagined!
 
 Your verification code is: {code}
 
@@ -117,7 +117,7 @@ This code will expire in {expires_in_minutes} minutes.
 If you didn't request this code, please ignore this email.
 
 Best regards,
-The musicASD Team
+The SonicSoothe Team
 """
 
         html_content = f"""
@@ -200,7 +200,7 @@ The musicASD Team
     <div class="email-container">
         <div class="header">
             <div class="emoji">🎵</div>
-            <h1>musicASD</h1>
+            <h1>SonicSoothe</h1>
             <p>Music Therapy, Reimagined ✨</p>
         </div>
 
@@ -225,7 +225,7 @@ The musicASD Team
 
         <div class="footer">
             <p>Made with 💙 for ASD therapy</p>
-            <p>© 2024 musicASD. All rights reserved.</p>
+            <p>© 2024 SonicSoothe. All rights reserved.</p>
         </div>
     </div>
 </body>
@@ -249,12 +249,12 @@ The musicASD Team
 
         reset_url = f"{frontend_url}/reset-password?token={reset_token}"
 
-        subject = "Password Reset - musicASD"
+        subject = "Password Reset - SonicSoothe"
 
         plain_content = f"""
 Password Reset Request
 
-We received a request to reset your musicASD account password.
+We received a request to reset your SonicSoothe account password.
 
 Click this link to reset your password:
 {reset_url}
@@ -264,7 +264,7 @@ This link will expire in 1 hour.
 If you didn't request this, please ignore this email.
 
 Best regards,
-The musicASD Team
+The SonicSoothe Team
 """
 
         html_content = f"""
@@ -342,7 +342,7 @@ The musicASD Team
 
         <div class="content">
             <h2 style="color: #6366f1;">Reset Your Password</h2>
-            <p>We received a request to reset your musicASD account password.</p>
+            <p>We received a request to reset your SonicSoothe account password.</p>
 
             <div class="button-container">
                 <a href="{reset_url}" class="button">
@@ -362,7 +362,7 @@ The musicASD Team
 
         <div class="footer">
             <p>Made with 💙 for ASD therapy</p>
-            <p>© 2024 musicASD. All rights reserved.</p>
+            <p>© 2024 SonicSoothe. All rights reserved.</p>
         </div>
     </div>
 </body>
@@ -383,14 +383,14 @@ The musicASD Team
     ) -> Dict[str, Any]:
         """Send welcome email after successful registration"""
 
-        subject = "Welcome to musicASD! 🎵"
+        subject = "Welcome to SonicSoothe! 🎵"
 
         plain_content = f"""
-Welcome to musicASD, {name}!
+Welcome to SonicSoothe, {name}!
 
 Your account has been created successfully.
 
-musicASD is an AI-powered music therapy platform designed for children with ASD.
+SonicSoothe is an AI-powered music therapy platform designed for children with ASD.
 Start creating personalized therapy sessions and track engagement in real-time.
 
 Get started by logging in to your account:
@@ -403,7 +403,7 @@ What you can do:
 - Generate custom music therapy sessions
 
 Best regards,
-The musicASD Team
+The SonicSoothe Team
 """
 
         html_content = f"""
@@ -479,7 +479,7 @@ The musicASD Team
     <div class="email-container">
         <div class="header">
             <div style="font-size: 48px;">🎶</div>
-            <h1>Welcome to musicASD!</h1>
+            <h1>Welcome to SonicSoothe!</h1>
             <p>Music Therapy, Reimagined ✨</p>
         </div>
 
@@ -510,7 +510,7 @@ The musicASD Team
 
         <div class="footer">
             <p>Made with 💜 for ASD therapy • Powered by GPT-4 & Azure</p>
-            <p>© 2024 musicASD. All rights reserved.</p>
+            <p>© 2024 SonicSoothe. All rights reserved.</p>
         </div>
     </div>
 </body>

@@ -2,6 +2,7 @@
 Session State Management
 """
 import logging
+import asyncio
 from pathlib import Path
 from datetime import datetime
 import pygame
@@ -41,7 +42,8 @@ class SessionState:
             Path("assets/music/generated"),
             Path("assets/music/calm"),
             Path("assets/music/happy"),
-            Path("assets/music/energetic")
+            Path("assets/music/energetic"),
+            Path("cache/music")  # Cache for Azure music files
         ]
 
         for directory in directories:
@@ -50,85 +52,119 @@ class SessionState:
         logger.info("Directories initialized")
 
     def scan_music_library(self):
-        """Scan and load all music files from assets folder"""
+        """Load music library from Azure Blob Storage"""
         self.music_library = {"calm": [], "happy": [], "energetic": []}
 
-        # Check both parent and local assets paths
-        search_paths = [
-            Path("../assets/music"),  # Parent directory
-            Path("assets/music")      # Local directory
-        ]
+        try:
+            # Check if there's a running event loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, can't use asyncio.run()
+                # Schedule the task to run in the existing loop
+                import concurrent.futures
+                import threading
 
-        for assets_path in search_paths:
-            if not assets_path.exists():
-                continue
+                def run_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        new_loop.run_until_complete(self._load_music_from_azure())
+                    finally:
+                        new_loop.close()
 
-            logger.info(f"Scanning music library at: {assets_path.absolute()}")
+                thread = threading.Thread(target=run_in_thread)
+                thread.start()
+                thread.join()
 
-            for style in ["calm", "happy", "energetic"]:
-                style_path = assets_path / style
-                if not style_path.exists():
-                    continue
-
-                # Scan for various audio formats
-                audio_extensions = ['*.mp3', '*.wav', '*.ogg', '*.m4a']
-
-                for ext in audio_extensions:
-                    for file_path in style_path.glob(ext):
-                        if not file_path.is_file():
-                            continue
-
-                        # Check if file already in library
-                        if any(f["name"] == file_path.name for f in self.music_library[style]):
-                            continue
-
-                        file_info = {
-                            "name": file_path.name,
-                            "path": str(file_path.absolute()),
-                            "size": file_path.stat().st_size,
-                            "duration": self.get_audio_duration(str(file_path.absolute()))
-                        }
-
-                        self.music_library[style].append(file_info)
-                        logger.debug(f"Added: {file_path.name} to {style} library")
-
-        # Scan generated files
-        self._scan_generated_files()
+            except RuntimeError:
+                # No running event loop, we can use asyncio.run()
+                asyncio.run(self._load_music_from_azure())
+        except Exception as e:
+            logger.error(f"Failed to load music from Azure: {e}")
+            logger.info("Music library will be empty - upload music files to Azure")
 
         # Log summary
         total_files = sum(len(files) for files in self.music_library.values())
-        logger.info(f"Music library loaded: {total_files} files total")
+        logger.info(f"Music library loaded from Azure: {total_files} files total")
         for style, files in self.music_library.items():
             logger.info(f"  {style}: {len(files)} files")
 
-    def _scan_generated_files(self):
-        """Scan generated music files"""
-        generated_path = Path("assets/music/generated")
-        if not generated_path.exists():
-            return
+    async def _load_music_from_azure(self):
+        """Load music file list from Azure"""
+        from services.azure_storage import azure_storage
 
-        for file_path in generated_path.glob("*.wav"):
-            # Determine style from filename
-            style = "calm"  # default
-            filename_lower = file_path.name.lower()
+        if not azure_storage.container_client:
+            await azure_storage.initialize()
 
-            if "happy" in filename_lower:
-                style = "happy"
-            elif "energetic" in filename_lower:
-                style = "energetic"
+        for category in ["calm", "happy", "energetic", "generated"]:
+            music_files = await azure_storage.list_music_files(category)
 
-            # Check if already in generated tones list
-            if any(t["name"] == file_path.name for t in self.generated_tones):
-                continue
+            for file_info in music_files:
+                # Determine target category (generated files may be categorized)
+                target_category = file_info["category"]
+                if target_category == "generated":
+                    # Try to determine style from filename
+                    filename_lower = file_info["name"].lower()
+                    if "happy" in filename_lower:
+                        target_category = "happy"
+                    elif "energetic" in filename_lower:
+                        target_category = "energetic"
+                    else:
+                        target_category = "calm"
 
-            tone_info = {
-                "name": file_path.name,
-                "style": style,
-                "duration": self.get_audio_duration(str(file_path.absolute())),
-                "created": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
-            }
+                if target_category not in self.music_library:
+                    self.music_library[target_category] = []
 
-            self.generated_tones.append(tone_info)
+                # Cache path where file will be stored locally
+                cache_path = Path(f"cache/music/{file_info['category']}/{file_info['name']}")
+
+                music_entry = {
+                    "name": file_info["name"],
+                    "path": str(cache_path.absolute()),  # Local cache path
+                    "blob_path": file_info["blob_path"],  # Azure path
+                    "category": file_info["category"],
+                    "size": file_info["size"],
+                    "cached": cache_path.exists(),  # Is it already cached?
+                    "duration": 0.0  # Will be calculated when cached
+                }
+
+                self.music_library[target_category].append(music_entry)
+                logger.debug(f"Added: {file_info['name']} to {target_category} library (Azure)")
+
+    async def ensure_music_cached(self, music_entry: dict) -> str:
+        """Ensure music file is cached locally, download if needed"""
+        from services.azure_storage import azure_storage
+
+        cache_path = Path(music_entry["path"])
+
+        # Already cached?
+        if cache_path.exists():
+            music_entry["cached"] = True
+            return str(cache_path.absolute())
+
+        # Download from Azure
+        logger.info(f"Downloading {music_entry['name']} from Azure...")
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+        file_data = await azure_storage.download_music_file(
+            music_entry["category"],
+            music_entry["name"]
+        )
+
+        if not file_data:
+            raise FileNotFoundError(f"Failed to download {music_entry['name']} from Azure")
+
+        # Save to cache
+        with open(cache_path, 'wb') as f:
+            f.write(file_data)
+
+        # Calculate duration
+        music_entry["duration"] = self.get_audio_duration(str(cache_path.absolute()))
+        music_entry["cached"] = True
+
+        logger.info(f"Cached: {music_entry['name']} ({len(file_data)} bytes)")
+        return str(cache_path.absolute())
+
 
     def get_audio_duration(self, filepath):
         """Get audio file duration in seconds"""

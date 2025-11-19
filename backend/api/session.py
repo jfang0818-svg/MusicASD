@@ -2,12 +2,14 @@
 Session API endpoints
 """
 
+from datetime import datetime
+import logging
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException, Body, Depends
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
-import logging
+
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
 from services.session_manager import get_session_manager
@@ -17,9 +19,11 @@ router = APIRouter(prefix="/session", tags=["session"])
 
 # Pydantic models
 class SessionStart(BaseModel):
+    """Request model for starting a new therapy session"""
     child_id: str
 
 class SessionLog(BaseModel):
+    """Request model for logging session events"""
     event: str
     note: Optional[str] = ""
     engagement: Optional[str] = None
@@ -29,7 +33,8 @@ class SessionLog(BaseModel):
     child_response: Optional[str] = None
 
 def get_state():
-    from main import state
+    """Get the global application state (for backwards compatibility)"""
+    from main import state  # pylint: disable=import-outside-toplevel
     return state
 
 @router.post("/start")
@@ -64,7 +69,11 @@ async def start_session(
         state.user_id = user_id
         state.logs = []
 
-        logger.info(f"Session started: {session['id']} for child {session_data.child_id}")
+        logger.info(
+            "Session started: %s for child %s",
+            session['id'],
+            session_data.child_id
+        )
 
         return {
             "status": "started",
@@ -75,8 +84,11 @@ async def start_session(
         }
 
     except Exception as e:
-        logger.error(f"Failed to start session: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to start session: {str(e)}")
+        logger.error("Failed to start session: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start session: {str(e)}"
+        ) from e
 
 @router.post("/stop")
 async def stop_session(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -104,7 +116,7 @@ async def stop_session(credentials: HTTPAuthorizationCredentials = Depends(secur
             state.music_playing = False
             state.current_music = None
         except Exception as e:
-            logger.error(f"Error stopping music: {e}")
+            logger.error("Error stopping music: %s", str(e))
 
     # End session using SessionManager
     try:
@@ -118,7 +130,7 @@ async def stop_session(credentials: HTTPAuthorizationCredentials = Depends(secur
         if hasattr(state, 'user_id'):
             delattr(state, 'user_id')
 
-        logger.info(f"Session stopped: {session_id}")
+        logger.info("Session stopped: %s", session_id)
         return {
             "status": "stopped",
             "session_id": session_id,
@@ -127,10 +139,13 @@ async def stop_session(credentials: HTTPAuthorizationCredentials = Depends(secur
             "timestamp": datetime.now().isoformat()
         }
 
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Access denied - session belongs to another user")
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied - session belongs to another user"
+        ) from exc
     except Exception as e:
-        logger.error(f"Failed to stop session: {e}")
+        logger.error("Failed to stop session: %s", str(e))
         # Fall back to legacy behavior
         state.session_active = False
         return {
@@ -190,16 +205,16 @@ async def log_session(log: SessionLog, credentials: HTTPAuthorizationCredentials
             **log.dict()
         })
 
-        logger.info(f"Event logged: {log.event}")
+        logger.info("Event logged: %s", log.event)
         return {"status": "logged", "timestamp": datetime.now().isoformat()}
 
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Failed to log event: {e}")
-        raise HTTPException(status_code=500, detail="Failed to log event")
+        logger.error("Failed to log event: %s", str(e))
+        raise HTTPException(status_code=500, detail="Failed to log event") from e
 
 @router.get("/logs")
 def get_logs():
@@ -221,40 +236,44 @@ def get_logs():
     }
 
 @router.get("/logs/{session_id}")
-def get_session_logs(session_id: str):
-    """Get logs for a specific session from database"""
+async def get_session_logs(
+    session_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Get logs for a specific session from Azure Blob Storage"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
+
     try:
-        conn = sqlite3.connect('data/session_logs.db')
-        c = conn.cursor()
-        c.execute("""SELECT timestamp, event, engagement, music_style,
-                            suggestion, caregiver_action, child_response, notes
-                     FROM logs WHERE session_id = ?
-                     ORDER BY timestamp""", (session_id,))
+        # Get session data from Azure Blob Storage
+        session_data = await azure_storage.get_session(session_id)
 
-        rows = c.fetchall()
-        conn.close()
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Session not found")
 
-        logs = []
-        for row in rows:
-            logs.append({
-                "timestamp": row[0],
-                "event": row[1],
-                "engagement": row[2],
-                "music_style": row[3],
-                "suggestion": row[4],
-                "caregiver_action": row[5],
-                "child_response": row[6],
-                "notes": row[7]
-            })
+        # Verify user owns this session
+        if session_data.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - session belongs to another user"
+            )
+
+        # Extract logs from session data
+        logs = session_data.get("logs", [])
 
         return {
             "session_id": session_id,
             "logs": logs,
             "count": len(logs)
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Failed to retrieve logs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to retrieve logs: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve session logs"
+        ) from e
 
 @router.post("/pause")
 def pause_session():
@@ -329,7 +348,7 @@ def caregiver_action(request: dict = Body(...)):
     }
     state.logs.append(log_data)
 
-    logger.info(f"Caregiver action recorded: {action}")
+    logger.info("Caregiver action recorded: %s", action)
 
     return {
         "status": "success",
@@ -432,3 +451,53 @@ async def get_child_sessions(
         "sessions": sessions,
         "total_sessions": len(sessions)
     }
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Delete a session (requires authentication and ownership)"""
+    user_id = auth_service.get_current_user_id(credentials)
+
+    try:
+        # Get all user sessions to find the one to delete
+        all_sessions = await azure_storage.list_user_sessions(user_id, limit=1000)
+        session = next((s for s in all_sessions if s.get("id") == session_id), None)
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Verify ownership
+        if session.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - session belongs to another user"
+            )
+
+        # Delete the session
+        child_id = session.get("child_id")
+        success = await azure_storage.delete_session(child_id, session_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to delete session"
+            )
+
+        logger.info("Session deleted: %s by user %s", session_id, user_id)
+        return {
+            "status": "deleted",
+            "session_id": session_id,
+            "message": "Session deleted successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete session: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to delete session"
+        ) from e
