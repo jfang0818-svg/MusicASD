@@ -51,7 +51,7 @@ export default function DashboardLayout({
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 dark:border-gray-700">
           <Link href="/" className="flex items-center gap-2 group">
             <Music className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-            <span className="text-xl font-bold">MusicASD</span>
+            <span className="text-xl font-bold">SonicSoothe</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}

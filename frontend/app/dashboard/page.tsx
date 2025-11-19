@@ -41,7 +41,7 @@ export default function DashboardPage() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                   SonicSoothe
                 </h1>
-                <p className="text-xs text-gray-500">Music Therapy for ASD</p>
+                <p className="text-xs text-gray-500">Music that heals</p>
               </div>
             </div>
 
