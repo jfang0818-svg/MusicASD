@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Music, Clock, TrendingUp, Key, Palette, Layers, Play, Download, Pause, Trash2, Edit2 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import type { MusicStyle } from '@/app/types';
 
 interface AIMusicGenerationModalProps {
   isOpen: boolean;
@@ -26,7 +27,7 @@ export default function AIMusicGenerationModal({
   const [generationMethod, setGenerationMethod] = useState<'musicgen' | 'gpt-midi' | 'simple'>('musicgen');
 
   // Music parameters
-  const [style, setStyle] = useState<'calm' | 'happy' | 'energetic'>('calm');
+  const [style, setStyle] = useState<MusicStyle>('calming_regulation');
   const [duration, setDuration] = useState(60);
   const [tempo, setTempo] = useState(120);
   const [musicalKey, setMusicalKey] = useState('C');
@@ -259,8 +260,8 @@ export default function AIMusicGenerationModal({
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                   Music Style
                 </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(['calm', 'happy', 'energetic'] as const).map((s) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {(['calming_regulation', 'focus_attention', 'social_interactive', 'movement_motor', 'sensory_seeking', 'sensory_soothing', 'sleep_rest', 'transition'] as const).map((s) => (
                     <button
                       key={s}
                       onClick={() => setStyle(s)}

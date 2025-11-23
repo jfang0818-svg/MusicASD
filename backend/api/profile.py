@@ -2,7 +2,7 @@
 Child Profile API Endpoints
 Handles CRUD operations for child profiles
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.security import HTTPAuthorizationCredentials
 from datetime import datetime
 from typing import List
@@ -12,7 +12,9 @@ from models.schemas import (
     ChildProfileUpdate,
     ChildProfileResponse,
     MusicElementsResponse,
-    SuccessResponse
+    SuccessResponse,
+    DocumentUploadResponse,
+    ProfileDocument
 )
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -240,3 +242,125 @@ async def get_music_elements(
         elements=elements,
         analyzed_at=datetime.fromisoformat(elements.get("analyzed_at", datetime.utcnow().isoformat()))
     )
+
+
+@router.post("/child/{child_id}/documents", response_model=DocumentUploadResponse)
+async def upload_document(
+    child_id: str,
+    file: UploadFile = File(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Upload a document for a child profile (requires authentication)
+    Accepts any file type
+    """
+    user_id = auth_service.get_current_user_id(credentials)
+
+    # Verify profile ownership
+    profile = await azure_storage.get_child_profile(user_id, child_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+
+    if profile["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Validate file size (max 50MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    file_data = await file.read()
+    if len(file_data) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50MB")
+
+    # Upload document
+    try:
+        doc_metadata = await azure_storage.upload_profile_document(
+            user_id=user_id,
+            child_id=child_id,
+            filename=file.filename,
+            file_data=file_data,
+            content_type=file.content_type or "application/octet-stream"
+        )
+
+        # Update profile with document metadata
+        if "documents" not in profile:
+            profile["documents"] = []
+
+        profile["documents"].append(doc_metadata)
+        profile["updated_at"] = datetime.utcnow().isoformat()
+
+        await azure_storage.save_child_profile(user_id, child_id, profile)
+
+        return DocumentUploadResponse(**doc_metadata)
+
+    except Exception as e:
+        print(f"Error uploading document: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload document")
+
+
+@router.get("/child/{child_id}/documents", response_model=List[ProfileDocument])
+async def list_documents(
+    child_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    List all documents for a child profile (requires authentication)
+    """
+    user_id = auth_service.get_current_user_id(credentials)
+
+    # Verify profile ownership
+    profile = await azure_storage.get_child_profile(user_id, child_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+
+    if profile["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get documents from profile or from storage
+    documents = profile.get("documents", [])
+
+    return [ProfileDocument(**doc) for doc in documents]
+
+
+@router.delete("/child/{child_id}/documents/{blob_path:path}", response_model=SuccessResponse)
+async def delete_document(
+    child_id: str,
+    blob_path: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Delete a document from a child profile (requires authentication)
+    """
+    user_id = auth_service.get_current_user_id(credentials)
+
+    # Verify profile ownership
+    profile = await azure_storage.get_child_profile(user_id, child_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Child profile not found")
+
+    if profile["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Delete document from blob storage
+    try:
+        success = await azure_storage.delete_profile_document(user_id, child_id, blob_path)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete document")
+
+        # Remove from profile metadata
+        if "documents" in profile:
+            profile["documents"] = [
+                doc for doc in profile["documents"]
+                if doc.get("blob_path") != blob_path
+            ]
+            profile["updated_at"] = datetime.utcnow().isoformat()
+            await azure_storage.save_child_profile(user_id, child_id, profile)
+
+        return SuccessResponse(
+            status="success",
+            message="Document deleted successfully"
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Error deleting document: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete document")

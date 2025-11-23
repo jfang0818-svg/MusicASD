@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { X, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMusicStore } from '@/app/store/useMusicStore';
-import type { ModalProps } from '@/app/types';
+import type { ModalProps, MusicStyle } from '@/app/types';
 
 interface GenerateMusicModalProps extends ModalProps {
   loadMusicLibrary: () => void;
@@ -20,7 +20,7 @@ export function GenerateMusicModal({
   const { generateNewMusic } = useMusicStore();
   const [loading, setLoading] = useState(false);
   const [generateOptions, setGenerateOptions] = useState({
-    style: 'calm' as 'calm' | 'happy' | 'energetic',
+    style: 'calming_regulation' as MusicStyle,
     duration: 10,
     filename: 'custom_tone',
     tempo: 120,

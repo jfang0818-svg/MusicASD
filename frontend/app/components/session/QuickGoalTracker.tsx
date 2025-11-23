@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Target, Plus, Minus, Check } from 'lucide-react';
+import { Target, Check } from 'lucide-react';
 
 interface TherapyGoal {
   goal_id: string;
@@ -26,10 +26,13 @@ interface TherapyGoal {
 interface QuickGoal {
   id: string;
   title: string;
-  targetValue: number;
-  currentValue: number;
-  unit: string;
-  type: 'count' | 'quality';
+  type: 'binary' | 'categorical';
+  description: string;
+  // For binary metrics
+  binaryValue?: boolean;
+  // For categorical metrics
+  categoricalValue?: string;
+  options?: string[];
 }
 
 interface QuickGoalTrackerProps {
@@ -38,43 +41,96 @@ interface QuickGoalTrackerProps {
   onGoalUpdate?: (goalId: string, value: number) => void;
 }
 
-// Fallback goals if no backend goals exist
+// Fallback goals if no backend goals exist - 9 comprehensive therapy metrics
 const DEFAULT_GOALS: QuickGoal[] = [
   {
-    id: 'vocalizations_default',
-    title: 'Vocalizations',
-    targetValue: 5,
-    currentValue: 0,
-    unit: 'times',
-    type: 'count'
+    id: 'initiation',
+    title: 'Initiation',
+    type: 'binary',
+    description: 'Student initiates participation without additional prompting',
+    binaryValue: undefined
   },
   {
-    id: 'eye_contact_default',
-    title: 'Eye Contact',
-    targetValue: 5,
-    currentValue: 0,
-    unit: 'times',
-    type: 'count'
+    id: 'task_persistence',
+    title: 'Task Persistence',
+    type: 'categorical',
+    description: 'Student engagement throughout activity',
+    categoricalValue: undefined,
+    options: ['Full completion', 'Majority completion', 'Some completion', 'No completion']
   },
   {
-    id: 'turn_taking_default',
-    title: 'Turn Taking',
-    targetValue: 4,
-    currentValue: 0,
-    unit: 'successful',
-    type: 'count'
+    id: 'response_to_prompt',
+    title: 'Response to Prompt',
+    type: 'binary',
+    description: 'Student responds appropriately to therapist prompts',
+    binaryValue: undefined
+  },
+  {
+    id: 'communication',
+    title: 'Communication',
+    type: 'binary',
+    description: 'Student demonstrates verbal or non-verbal communication',
+    binaryValue: undefined
+  },
+  {
+    id: 'motor_movement',
+    title: 'Motor Movement',
+    type: 'binary',
+    description: 'Student exhibits purposeful motor responses',
+    binaryValue: undefined
+  },
+  {
+    id: 'rhythmic_synchronization',
+    title: 'Rhythmic Synchronization',
+    type: 'categorical',
+    description: 'Student synchronizes movements with music rhythm',
+    categoricalValue: undefined,
+    options: ['Continuous sync', 'Brief sync', 'No sync']
+  },
+  {
+    id: 'emotion',
+    title: 'Emotion',
+    type: 'categorical',
+    description: 'Student displays emotional response',
+    categoricalValue: undefined,
+    options: ['Positive affect', 'Neutral affect', 'Disengaged']
+  },
+  {
+    id: 'aversion',
+    title: 'Aversion',
+    type: 'binary',
+    description: 'Student shows signs of discomfort or aversion',
+    binaryValue: undefined
+  },
+  {
+    id: 'deviance_engagement',
+    title: 'Deviance from Typical Engagement',
+    type: 'categorical',
+    description: 'Comparison to student\'s baseline engagement',
+    categoricalValue: undefined,
+    options: [
+      'Significantly less engaged',
+      'Somewhat less engaged',
+      'Typical engagement',
+      'Somewhat greater engaged',
+      'Significantly greater engaged'
+    ]
   }
 ];
 
 // Convert backend TherapyGoal to QuickGoal format
 function convertToQuickGoal(therapyGoal: TherapyGoal): QuickGoal {
+  const isBinary = therapyGoal.measurement_type === 'binary';
+  const isCategorical = therapyGoal.measurement_type === 'categorical';
+
   return {
     id: therapyGoal.goal_id,
     title: therapyGoal.title,
-    targetValue: therapyGoal.target,
-    currentValue: therapyGoal.current_value,
-    unit: therapyGoal.unit,
-    type: therapyGoal.measurement_type === 'quality_1_5' ? 'quality' : 'count'
+    type: isBinary ? 'binary' : isCategorical ? 'categorical' : 'binary',
+    description: therapyGoal.description || '',
+    binaryValue: isBinary ? undefined : undefined,
+    categoricalValue: isCategorical ? undefined : undefined,
+    options: isCategorical ? [] : undefined
   };
 }
 
@@ -90,31 +146,30 @@ export default function QuickGoalTracker({
   useEffect(() => {
     if (backendGoals && backendGoals.length > 0) {
       // Convert backend goals to QuickGoal format
-      const quickGoals = backendGoals.slice(0, 5).map(convertToQuickGoal); // Limit to 5 for UI space
+      const quickGoals = backendGoals.slice(0, 8).map(convertToQuickGoal); // Show up to 8 goals
       setGoals(quickGoals);
     } else {
-      // Use default goals if none from backend
+      // Use default 8 therapy metrics if none from backend
       setGoals(DEFAULT_GOALS);
     }
   }, [backendGoals]);
 
-  const incrementGoal = (goalId: string) => {
+  const toggleBinaryGoal = (goalId: string, value: boolean) => {
     setGoals(prev => prev.map(goal => {
-      if (goal.id === goalId && goal.currentValue < goal.targetValue + 10) {
-        const newValue = goal.currentValue + 1;
-        onGoalUpdate?.(goalId, newValue);
-        return { ...goal, currentValue: newValue };
+      if (goal.id === goalId && goal.type === 'binary') {
+        onGoalUpdate?.(goalId, value ? 1 : 0);
+        return { ...goal, binaryValue: value };
       }
       return goal;
     }));
   };
 
-  const decrementGoal = (goalId: string) => {
+  const setCategoricalGoal = (goalId: string, value: string) => {
     setGoals(prev => prev.map(goal => {
-      if (goal.id === goalId && goal.currentValue > 0) {
-        const newValue = goal.currentValue - 1;
-        onGoalUpdate?.(goalId, newValue);
-        return { ...goal, currentValue: newValue };
+      if (goal.id === goalId && goal.type === 'categorical') {
+        const valueIndex = goal.options?.indexOf(value) ?? -1;
+        onGoalUpdate?.(goalId, valueIndex);
+        return { ...goal, categoricalValue: value };
       }
       return goal;
     }));
@@ -151,72 +206,70 @@ export default function QuickGoalTracker({
 
           <div className="space-y-3">
             {goals.map(goal => {
-            const progress = (goal.currentValue / goal.targetValue) * 100;
-            const isAchieved = goal.currentValue >= goal.targetValue;
-
-            return (
-              <motion.div
-                key={goal.id}
-                className={`p-3 rounded-lg border-2 ${
-                  isAchieved
-                    ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
-                    : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm text-gray-900 dark:text-white">
+              return (
+                <motion.div
+                  key={goal.id}
+                  className="p-3 rounded-lg border-2 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-white mb-1">
                         {goal.title}
                       </p>
-                      {isAchieved && (
-                        <Check className="h-4 w-4 text-green-600" />
-                      )}
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {goal.description}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Target: {goal.targetValue} {goal.unit}
-                    </p>
                   </div>
 
-                  {/* Counter */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => decrementGoal(goal.id)}
-                      disabled={goal.currentValue === 0}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-
-                    <div className="w-12 text-center">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {goal.currentValue}
-                      </span>
+                  {/* Binary Toggle */}
+                  {goal.type === 'binary' && (
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => toggleBinaryGoal(goal.id, true)}
+                        className={`flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition-all ${
+                          goal.binaryValue === true
+                            ? 'bg-green-500 text-white shadow-md'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        {goal.binaryValue === true && <Check className="inline h-4 w-4 mr-1" />}
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => toggleBinaryGoal(goal.id, false)}
+                        className={`flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition-all ${
+                          goal.binaryValue === false
+                            ? 'bg-red-500 text-white shadow-md'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        {goal.binaryValue === false && <Check className="inline h-4 w-4 mr-1" />}
+                        No
+                      </button>
                     </div>
+                  )}
 
-                    <button
-                      onClick={() => incrementGoal(goal.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 text-green-600 dark:text-green-400 transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                  <motion.div
-                    className={`h-full ${
-                      isAchieved ? 'bg-green-500' : 'bg-purple-500'
-                    }`}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(progress, 100)}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-              </motion.div>
-            );
-          })}
+                  {/* Categorical Dropdown */}
+                  {goal.type === 'categorical' && (
+                    <div className="mt-3">
+                      <select
+                        value={goal.categoricalValue || ''}
+                        onChange={(e) => setCategoricalGoal(goal.id, e.target.value)}
+                        className="w-full p-2 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="">Select option...</option>
+                        {goal.options?.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
         </>
       )}
@@ -226,9 +279,12 @@ export default function QuickGoalTracker({
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <div className="text-center">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Goals Achieved:{' '}
-              <span className="font-bold text-green-600">
-                {goals.filter(g => g.currentValue >= g.targetValue).length}
+              Metrics Tracked:{' '}
+              <span className="font-bold text-purple-600">
+                {goals.filter(g =>
+                  (g.type === 'binary' && g.binaryValue !== undefined) ||
+                  (g.type === 'categorical' && g.categoricalValue !== undefined && g.categoricalValue !== '')
+                ).length}
               </span>{' '}
               / {goals.length}
             </p>

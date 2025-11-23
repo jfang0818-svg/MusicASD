@@ -55,7 +55,9 @@ class SessionManager:
             "engagement_level": "MED",
             "music_played": [],
             "suggestions_generated": 0,
-            "suggestions_accepted": 0
+            "suggestions_accepted": 0,
+            "metrics": [],
+            "quick_notes": ""
         }
 
         # Save to Redis (fast access)

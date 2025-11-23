@@ -5,7 +5,7 @@ import { Music, X, Sparkles, AlertCircle } from 'lucide-react';
 
 interface AdaptiveMusicRecommendation {
   shouldChange: boolean;
-  recommendedStyle: 'calm' | 'happy' | 'energetic' | null;
+  recommendedStyle: 'calming_regulation' | 'focus_attention' | 'movement_motor' | null;
   reason: string;
   confidence: number;
 }

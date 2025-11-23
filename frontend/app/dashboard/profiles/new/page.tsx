@@ -2,15 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createChildProfile } from '../../../lib/api';
+import { createChildProfile, uploadProfileDocument } from '../../../lib/api';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles, Upload, X, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 export default function NewProfilePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -65,6 +66,21 @@ export default function NewProfilePage() {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setUploadedFiles(prev => [...prev, ...files]);
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -114,7 +130,29 @@ export default function NewProfilePage() {
       };
 
       const result = await createChildProfile(profile);
-      toast.success(`Profile created for ${result.demographics.name}! 🎉`);
+
+      // Upload documents if any
+      if (uploadedFiles.length > 0) {
+        toast.success(`Profile created! Uploading ${uploadedFiles.length} document(s)...`);
+
+        let uploadSuccessCount = 0;
+        for (const file of uploadedFiles) {
+          try {
+            await uploadProfileDocument(result.id, file);
+            uploadSuccessCount++;
+          } catch (uploadError) {
+            console.error(`Error uploading ${file.name}:`, uploadError);
+            toast.error(`Failed to upload ${file.name}`);
+          }
+        }
+
+        if (uploadSuccessCount > 0) {
+          toast.success(`Profile created with ${uploadSuccessCount} document(s)! 🎉`);
+        }
+      } else {
+        toast.success(`Profile created for ${result.demographics.name}! 🎉`);
+      }
+
       router.push('/dashboard');
     } catch (error: any) {
       console.error('Error creating profile:', error);
@@ -522,6 +560,76 @@ export default function NewProfilePage() {
                   placeholder="Sensory processing, Social skills, Communication"
                 />
               </div>
+            </div>
+          </motion.div>
+
+          {/* Documents Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white rounded-3xl p-6 shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">📎</span>
+              <h2 className="text-xl font-bold text-gray-800">Documents</h2>
+              <span className="text-sm text-gray-500">(Optional)</span>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Upload any relevant documents about the participant (e.g., therapy reports, assessments, medical records)
+              </p>
+
+              {/* File Input */}
+              <div className="relative">
+                <input
+                  type="file"
+                  id="file-upload"
+                  onChange={handleFileSelect}
+                  multiple
+                  className="hidden"
+                />
+                <label
+                  htmlFor="file-upload"
+                  className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-purple-300 rounded-xl hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all"
+                >
+                  <Upload className="w-5 h-5 text-purple-600" />
+                  <span className="text-sm font-medium text-purple-600">
+                    Choose Files or Drag & Drop
+                  </span>
+                </label>
+              </div>
+
+              {/* File List */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-gray-700">
+                    Selected Files ({uploadedFiles.length})
+                  </p>
+                  {uploadedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{file.name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(index)}
+                        className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-600" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
 

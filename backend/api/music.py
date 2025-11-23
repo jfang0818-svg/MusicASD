@@ -134,6 +134,60 @@ def stop_music():
         logger.error(f"Error stopping music: {e}")
         return {"status": "error", "message": str(e)}
 
+@router.post("/pause")
+def pause_music():
+    """Pause currently playing music"""
+    state = get_state()
+
+    try:
+        if not state.music_playing:
+            return {"status": "error", "message": "No music is currently playing"}
+
+        pygame.mixer.music.pause()
+        logger.info("Music paused")
+
+        # Log music pause event if session is active
+        if state.session_active and state.current_music:
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "session_id": state.session_id,
+                "event": "Music Paused",
+                "music_file": state.current_music
+            }
+            state.logs.append(log_entry)
+
+        return {"status": "paused", "timestamp": datetime.now().isoformat()}
+    except Exception as e:
+        logger.error(f"Error pausing music: {e}")
+        return {"status": "error", "message": str(e)}
+
+@router.post("/resume")
+def resume_music():
+    """Resume paused music"""
+    state = get_state()
+
+    try:
+        if not state.music_playing:
+            return {"status": "error", "message": "No music to resume"}
+
+        pygame.mixer.music.unpause()
+        logger.info("Music resumed")
+
+        # Log music resume event if session is active
+        if state.session_active and state.current_music:
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "session_id": state.session_id,
+                "event": "Music Resumed",
+                "music_file": state.current_music
+            }
+            state.logs.append(log_entry)
+
+        return {"status": "playing", "timestamp": datetime.now().isoformat()}
+    except Exception as e:
+        logger.error(f"Error resuming music: {e}")
+        return {"status": "error", "message": str(e)}
+
 @router.get("/status")
 def music_status():
     """Get current music playback status"""

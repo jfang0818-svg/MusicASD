@@ -4,29 +4,31 @@ import {
   apiClient
 } from '@/app/lib/api';
 import toast from 'react-hot-toast';
-import type { MusicLibrary, GeneratedTone } from '@/app/types';
+import type { MusicLibrary, GeneratedTone, MusicStyle } from '@/app/types';
 
 interface MusicState {
   // Music state
   musicPlaying: boolean;
   currentMusic: string | null;
-  currentStyle: 'calm' | 'happy' | 'energetic' | null;
+  currentStyle: MusicStyle | null;
   volume: number;
   musicLibrary: MusicLibrary;
   generatedTones: GeneratedTone[];
   loading: boolean;
 
   // Actions
-  playMusic: (style: 'calm' | 'happy' | 'energetic', file?: string) => Promise<void>;
-  playMusicAdaptive: (style: 'calm' | 'happy' | 'energetic', reason?: string) => Promise<void>;
+  playMusic: (style: MusicStyle, file?: string) => Promise<void>;
+  playMusicAdaptive: (style: MusicStyle, reason?: string) => Promise<void>;
   stopMusic: () => Promise<void>;
+  pauseMusic: () => Promise<void>;
+  resumeMusic: () => Promise<void>;
   setVolume: (volume: number) => void;
   loadMusicLibrary: () => Promise<void>;
   loadGeneratedTones: () => Promise<void>;
-  uploadMusicFile: (file: File, style: 'calm' | 'happy' | 'energetic') => Promise<void>;
+  uploadMusicFile: (file: File, style: MusicStyle) => Promise<void>;
   deleteGeneratedTone: (toneName: string) => Promise<void>;
   generateNewMusic: (options: {
-    style: 'calm' | 'happy' | 'energetic';
+    style: MusicStyle;
     duration: number;
     filename: string;
     tempo?: number;
@@ -40,12 +42,21 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   currentMusic: null,
   currentStyle: null,
   volume: 0.7,
-  musicLibrary: { calm: [], happy: [], energetic: [] },
+  musicLibrary: {
+    calming_regulation: [],
+    focus_attention: [],
+    social_interactive: [],
+    movement_motor: [],
+    sensory_seeking: [],
+    sensory_soothing: [],
+    sleep_rest: [],
+    transition: []
+  },
   generatedTones: [],
   loading: false,
 
   // Play music
-  playMusic: async (style: 'calm' | 'happy' | 'energetic', file?: string) => {
+  playMusic: async (style: MusicStyle, file?: string) => {
     set({ loading: true });
     try {
       await apiClient.post('/music/play', {
@@ -69,7 +80,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   // Play music adaptively (with AI reasoning)
-  playMusicAdaptive: async (style: 'calm' | 'happy' | 'energetic', reason?: string) => {
+  playMusicAdaptive: async (style: MusicStyle, reason?: string) => {
     set({ loading: true });
     try {
       await apiClient.post('/music/play', {
@@ -110,6 +121,29 @@ export const useMusicStore = create<MusicState>((set, get) => ({
     }
   },
 
+  // Pause music
+  pauseMusic: async () => {
+    try {
+      await apiClient.post('/music/pause');
+      // Note: Keep musicPlaying as true but paused state is managed by backend
+      toast.success('Music paused');
+    } catch (error) {
+      console.error('Error pausing music:', error);
+      toast.error('Failed to pause music');
+    }
+  },
+
+  // Resume music
+  resumeMusic: async () => {
+    try {
+      await apiClient.post('/music/resume');
+      toast.success('Music resumed');
+    } catch (error) {
+      console.error('Error resuming music:', error);
+      toast.error('Failed to resume music');
+    }
+  },
+
   // Set volume
   setVolume: (volume: number) => set({ volume }),
 
@@ -117,7 +151,16 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   loadMusicLibrary: async () => {
     try {
       const response = await apiClient.get('/music/library');
-      set({ musicLibrary: response.data.library || { calm: [], happy: [], energetic: [] } });
+      set({ musicLibrary: response.data.library || {
+        calming_regulation: [],
+        focus_attention: [],
+        social_interactive: [],
+        movement_motor: [],
+        sensory_seeking: [],
+        sensory_soothing: [],
+        sleep_rest: [],
+        transition: []
+      } });
     } catch (error) {
       console.error('Error loading music library:', error);
       toast.error('Failed to load music library');
@@ -135,7 +178,7 @@ export const useMusicStore = create<MusicState>((set, get) => ({
   },
 
   // Upload music file
-  uploadMusicFile: async (file: File, style: 'calm' | 'happy' | 'energetic') => {
+  uploadMusicFile: async (file: File, style: MusicStyle) => {
     const formData = new FormData();
     formData.append('file', file);
 

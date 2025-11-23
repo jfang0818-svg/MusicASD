@@ -112,13 +112,18 @@ export function calculateEngagement(metrics: {
 }
 
 /**
- * Get mood color based on mood type
+ * Get mood color based on therapeutic music category
  */
-export function getMoodColor(mood: 'calm' | 'happy' | 'energetic'): string {
-  const colors = {
-    calm: 'bg-blue-500',
-    happy: 'bg-yellow-500',
-    energetic: 'bg-red-500',
+export function getMoodColor(mood: string): string {
+  const colors: Record<string, string> = {
+    calming_regulation: 'bg-blue-500',
+    focus_attention: 'bg-purple-500',
+    social_interactive: 'bg-green-500',
+    movement_motor: 'bg-orange-500',
+    sensory_seeking: 'bg-yellow-500',
+    sensory_soothing: 'bg-teal-500',
+    sleep_rest: 'bg-indigo-500',
+    transition: 'bg-pink-500',
   };
   return colors[mood] || 'bg-gray-500';
 }

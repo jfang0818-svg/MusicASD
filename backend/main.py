@@ -17,7 +17,7 @@ from core.config import settings
 from core.state import SessionState
 
 # Import API routers
-from api import analytics, engagement, music, session, camera, health, auth, profile, websocket_analysis, goals, session_notes, child_analytics, home_routines, notifications, interactive_activities, session_videos, gamification
+from api import analytics, engagement, music, music_response, session, camera, health, auth, profile, websocket_analysis, goals, session_notes, child_analytics, home_routines, notifications, interactive_activities, session_videos, gamification, favorites, freeze_game, sound_matching, ambient_music, musical_storytelling, music_recommendations, movement_activities, emotion_music, tracking, planned_sessions, ai_session_planner, templates
 
 # Import services
 from services.azure_storage import azure_storage
@@ -68,8 +68,20 @@ state = SessionState()
 # Include API routers
 app.include_router(auth.router)  # Authentication endpoints
 app.include_router(profile.router)  # Child profile management
+app.include_router(favorites.router)  # Favorites management
+app.include_router(freeze_game.router)  # Freeze game activity
+app.include_router(sound_matching.router)  # Sound matching game
+app.include_router(ambient_music.router)  # Ambient generative music
+app.include_router(musical_storytelling.router)  # Musical storytelling
+app.include_router(music_recommendations.router)  # AI music recommendations
+app.include_router(movement_activities.router)  # Movement activities
+app.include_router(emotion_music.router)  # Emotion-matching music
+app.include_router(tracking.router)  # Usage tracking and analytics
 app.include_router(goals.router)  # Goal tracking
 app.include_router(session_notes.router)  # Session notes and observations
+app.include_router(planned_sessions.router)  # Planned sessions management
+app.include_router(templates.router)  # Session templates management
+app.include_router(ai_session_planner.router)  # AI-powered session planning
 app.include_router(child_analytics.router)  # Child progress analytics
 app.include_router(home_routines.router)  # Home routines and playlist export
 app.include_router(notifications.router)  # Notifications and parent communication
@@ -79,6 +91,7 @@ app.include_router(gamification.router)  # Achievements and rewards
 app.include_router(analytics.router)
 app.include_router(engagement.router)
 app.include_router(music.router)
+app.include_router(music_response.router)  # Music response metrics
 app.include_router(session.router)
 app.include_router(camera.router)
 app.include_router(health.router)

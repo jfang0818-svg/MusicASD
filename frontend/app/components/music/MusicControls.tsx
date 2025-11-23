@@ -2,14 +2,14 @@
 
 import { Music, Volume2, Play, Square, FileAudio, Sparkles } from 'lucide-react';
 import { cn } from '@/app/lib/utils';
-import type { MusicLibrary, GeneratedTone } from '@/app/types';
+import type { MusicLibrary, GeneratedTone, MusicStyle } from '@/app/types';
 
 interface MusicControlsProps {
   sessionActive: boolean;
   volume: number;
   setVolume: (volume: number) => void;
-  selectedStyle: 'calm' | 'happy' | 'energetic';
-  playMusic: (style: 'calm' | 'happy' | 'energetic', file?: string) => void;
+  selectedStyle: MusicStyle;
+  playMusic: (style: MusicStyle, file?: string) => void;
   stopMusic: () => void;
   musicPlaying: boolean;
   currentMusic: string | null;
@@ -43,10 +43,15 @@ export function MusicControls({
 }: MusicControlsProps) {
   const totalFiles = Object.values(musicLibrary).reduce((sum, files) => sum + files.length, 0);
 
-  const styles: { value: 'calm' | 'happy' | 'energetic'; label: string; emoji: string; color: string }[] = [
-    { value: 'calm', label: 'Calm', emoji: '😌', color: 'bg-purple-500' },
-    { value: 'happy', label: 'Happy', emoji: '😊', color: 'bg-pink-500' },
-    { value: 'energetic', label: 'Energetic', emoji: '🎉', color: 'bg-orange-500' }
+  const styles: { value: MusicStyle; label: string; emoji: string; color: string }[] = [
+    { value: 'calming_regulation', label: 'Calming', emoji: '😌', color: 'bg-blue-500' },
+    { value: 'focus_attention', label: 'Focus', emoji: '🎯', color: 'bg-purple-500' },
+    { value: 'social_interactive', label: 'Social', emoji: '👥', color: 'bg-green-500' },
+    { value: 'movement_motor', label: 'Movement', emoji: '🏃', color: 'bg-orange-500' },
+    { value: 'sensory_seeking', label: 'Seeking', emoji: '⚡', color: 'bg-yellow-500' },
+    { value: 'sensory_soothing', label: 'Soothing', emoji: '🌊', color: 'bg-teal-500' },
+    { value: 'sleep_rest', label: 'Sleep', emoji: '😴', color: 'bg-indigo-500' },
+    { value: 'transition', label: 'Transition', emoji: '🔄', color: 'bg-pink-500' }
   ];
 
   return (
@@ -81,7 +86,7 @@ export function MusicControls({
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
           Quick Play
         </h3>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {styles.map((style) => (
             <button
               key={style.value}

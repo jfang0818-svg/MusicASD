@@ -169,6 +169,68 @@ class AzureStorageService:
 
         return True
 
+    # Document Management for Child Profiles
+    async def upload_profile_document(
+        self, user_id: str, child_id: str, filename: str, file_data: bytes, content_type: str
+    ) -> Dict[str, Any]:
+        """Upload a document for a child profile"""
+        # Create safe filename
+        import re
+        safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{timestamp}_{safe_filename}"
+
+        blob_path = f"documents/user_{user_id}/child_{child_id}/{unique_filename}"
+
+        # Upload file
+        success = await self.upload_file(blob_path, file_data, content_type)
+
+        if success:
+            return {
+                "filename": filename,
+                "blob_path": blob_path,
+                "file_type": content_type,
+                "file_size": len(file_data),
+                "uploaded_at": datetime.now().isoformat()
+            }
+        else:
+            raise Exception("Failed to upload document")
+
+    async def delete_profile_document(
+        self, user_id: str, child_id: str, blob_path: str
+    ) -> bool:
+        """Delete a document from a child profile"""
+        # Verify the blob path belongs to the correct user and child
+        expected_prefix = f"documents/user_{user_id}/child_{child_id}/"
+        if not blob_path.startswith(expected_prefix):
+            raise ValueError("Invalid document path")
+
+        return await self._delete_blob(blob_path)
+
+    async def list_profile_documents(
+        self, user_id: str, child_id: str
+    ) -> List[Dict[str, Any]]:
+        """List all documents for a child profile"""
+        documents = []
+        prefix = f"documents/user_{user_id}/child_{child_id}/"
+
+        try:
+            async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+                blob_client = self.container_client.get_blob_client(blob.name)
+                properties = await blob_client.get_blob_properties()
+
+                documents.append({
+                    "filename": blob.name.split("/")[-1],  # Extract filename
+                    "blob_path": blob.name,
+                    "file_type": properties.content_settings.content_type or "application/octet-stream",
+                    "file_size": properties.size,
+                    "uploaded_at": properties.last_modified.isoformat()
+                })
+        except Exception as e:
+            print(f"Error listing documents: {e}")
+
+        return documents
+
     # Music Element Analysis
     async def save_music_elements(
         self, user_id: str, child_id: str, elements_data: Dict[str, Any]
@@ -199,6 +261,18 @@ class AzureStorageService:
         """Retrieve session data"""
         blob_path = f"sessions/child_{child_id}/session_{session_id}.json"
         return await self._load_json(blob_path)
+
+    async def find_session_by_id(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Find a session by session_id alone (scans all sessions)"""
+        prefix = "sessions/"
+
+        async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+            if blob.name.endswith(".json"):
+                session_data = await self._load_json(blob.name)
+                if session_data and session_data.get("id") == session_id:
+                    return session_data
+
+        return None
 
     async def list_child_sessions(self, child_id: str) -> List[Dict[str, Any]]:
         """List all sessions for a child"""
@@ -242,7 +316,7 @@ class AzureStorageService:
 
     # Music Management
     async def list_music_files(self, category: str = None) -> List[Dict[str, Any]]:
-        """List all music files, optionally filtered by category (calm/happy/energetic/generated)"""
+        """List all music files, optionally filtered by category"""
         music_files = []
         prefix = f"music/{category}/" if category else "music/"
 
@@ -253,9 +327,23 @@ class AzureStorageService:
                 file_category = parts[1] if len(parts) > 1 else "unknown"
                 filename = parts[-1]
 
+                # Get metadata to check for additional categories
+                blob_client = self.container_client.get_blob_client(blob.name)
+                try:
+                    blob_properties = await blob_client.get_blob_properties()
+                    metadata = blob_properties.metadata or {}
+
+                    # Parse categories from metadata (stored as comma-separated string)
+                    categories_str = metadata.get('categories', file_category)
+                    categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
+                except Exception as e:
+                    print(f"Error getting metadata for {blob.name}: {e}")
+                    categories = [file_category]
+
                 music_files.append({
                     "name": filename,
-                    "category": file_category,
+                    "category": file_category,  # Primary category (from path)
+                    "categories": categories,  # All categories
                     "blob_path": blob.name,
                     "size": blob.size,
                     "url": f"{self.container_client.url}/{blob.name}"
@@ -264,11 +352,18 @@ class AzureStorageService:
         return music_files
 
     async def upload_music_file(
-        self, category: str, filename: str, file_data: bytes, content_type: str = "audio/wav"
+        self, category: str, filename: str, file_data: bytes, content_type: str = "audio/wav",
+        categories: List[str] = None
     ) -> bool:
-        """Upload a music file to Azure"""
+        """Upload a music file to Azure with optional multiple categories"""
         blob_path = f"music/{category}/{filename}"
-        return await self.upload_file(blob_path, file_data, content_type)
+
+        # If multiple categories provided, store as metadata
+        if categories:
+            metadata = {"categories": ",".join(categories)}
+            return await self.upload_file_with_metadata(blob_path, file_data, content_type, metadata)
+        else:
+            return await self.upload_file(blob_path, file_data, content_type)
 
     async def download_music_file(self, category: str, filename: str) -> Optional[bytes]:
         """Download a music file from Azure"""
@@ -289,6 +384,22 @@ class AzureStorageService:
             return True
         except Exception as e:
             print(f"Error uploading file {blob_path}: {e}")
+            return False
+
+    async def upload_file_with_metadata(
+        self, blob_path: str, file_data: bytes, content_type: str = "application/octet-stream",
+        metadata: Dict[str, str] = None
+    ) -> bool:
+        """Upload a file to blob storage with metadata"""
+        try:
+            blob_client = self.container_client.get_blob_client(blob_path)
+            content_settings = ContentSettings(content_type=content_type)
+            await blob_client.upload_blob(
+                file_data, overwrite=True, content_settings=content_settings, metadata=metadata
+            )
+            return True
+        except Exception as e:
+            print(f"Error uploading file {blob_path} with metadata: {e}")
             return False
 
     async def download_file(self, blob_path: str) -> Optional[bytes]:
@@ -398,6 +509,10 @@ class AzureStorageService:
         return False
 
     # Helper methods
+    async def save_json(self, blob_path: str, data: Dict[str, Any]) -> bool:
+        """Public wrapper for _save_json"""
+        return await self._save_json(blob_path, data)
+
     async def _save_json(self, blob_path: str, data: Dict[str, Any]) -> bool:
         """Save JSON data to blob storage"""
         try:
@@ -411,6 +526,10 @@ class AzureStorageService:
         except Exception as e:
             print(f"Error saving JSON to {blob_path}: {e}")
             return False
+
+    async def load_json(self, blob_path: str) -> Optional[Dict[str, Any]]:
+        """Public wrapper for _load_json"""
+        return await self._load_json(blob_path)
 
     async def _load_json(self, blob_path: str) -> Optional[Dict[str, Any]]:
         """Load JSON data from blob storage"""
@@ -448,6 +567,95 @@ class AzureStorageService:
         except Exception as e:
             print(f"Error checking blob existence {blob_path}: {e}")
             return False
+
+    # ===================== PLANNED SESSIONS METHODS =====================
+
+    async def save_planned_session(
+        self, user_id: str, session_id: str, session_data: Dict[str, Any]
+    ) -> bool:
+        """Save planned session data"""
+        blob_path = f"planned_sessions/user_{user_id}/{session_id}.json"
+        return await self._save_json(blob_path, session_data)
+
+    async def get_planned_session(
+        self, user_id: str, session_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve a specific planned session"""
+        blob_path = f"planned_sessions/user_{user_id}/{session_id}.json"
+        return await self._load_json(blob_path)
+
+    async def get_planned_sessions(
+        self, user_id: str, child_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get all planned sessions for a user, optionally filtered by child"""
+        sessions = []
+        prefix = f"planned_sessions/user_{user_id}/"
+
+        async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+            if blob.name.endswith(".json"):
+                session_data = await self._load_json(blob.name)
+                if session_data:
+                    # Filter by child_id if provided
+                    if child_id is None or session_data.get("childId") == child_id:
+                        sessions.append(session_data)
+
+        # Sort by scheduled date time
+        sessions.sort(key=lambda x: x.get("scheduledDateTime", ""))
+        return sessions
+
+    async def get_upcoming_planned_sessions(
+        self, user_id: str, child_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get upcoming planned sessions for a specific child"""
+        all_sessions = await self.get_planned_sessions(user_id, child_id)
+
+        # Filter for upcoming status only
+        upcoming = [s for s in all_sessions if s.get("status") == "upcoming"]
+
+        # Sort by scheduled date time
+        upcoming.sort(key=lambda x: x.get("scheduledDateTime", ""))
+        return upcoming
+
+    async def delete_planned_session(self, user_id: str, session_id: str) -> bool:
+        """Delete a planned session"""
+        blob_path = f"planned_sessions/user_{user_id}/{session_id}.json"
+        return await self._delete_blob(blob_path)
+
+    # ===================== SESSION TEMPLATES =====================
+
+    async def save_session_template(
+        self, user_id: str, template_id: str, template_data: Dict[str, Any]
+    ) -> bool:
+        """Save session template data"""
+        blob_path = f"session_templates/user_{user_id}/{template_id}.json"
+        return await self._save_json(blob_path, template_data)
+
+    async def get_session_template(
+        self, user_id: str, template_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve a specific session template"""
+        blob_path = f"session_templates/user_{user_id}/{template_id}.json"
+        return await self._load_json(blob_path)
+
+    async def get_session_templates(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get all session templates for a user"""
+        templates = []
+        prefix = f"session_templates/user_{user_id}/"
+
+        async for blob in self.container_client.list_blobs(name_starts_with=prefix):
+            if blob.name.endswith(".json"):
+                template_data = await self._load_json(blob.name)
+                if template_data:
+                    templates.append(template_data)
+
+        # Sort by created date (newest first)
+        templates.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return templates
+
+    async def delete_session_template(self, user_id: str, template_id: str) -> bool:
+        """Delete a session template"""
+        blob_path = f"session_templates/user_{user_id}/{template_id}.json"
+        return await self._delete_blob(blob_path)
 
 
 # Singleton instance

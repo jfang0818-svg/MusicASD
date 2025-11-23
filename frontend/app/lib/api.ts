@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
+import type { MusicStyle } from '@/app/types';
 
 // API Base URLs from environment variables
 // Use Next.js proxy for API calls to avoid CORS issues
@@ -92,7 +93,8 @@ export interface Session {
 export interface MusicTrack {
   id: string;
   name: string;
-  category: 'calm' | 'happy' | 'energetic';
+  category: MusicStyle;  // Primary category
+  categories?: MusicStyle[];  // All categories
   duration: number;
   url: string;
   generated?: boolean;
@@ -114,7 +116,8 @@ export interface DashboardStats {
 }
 
 export interface GenerateMusicParams {
-  mood: 'calm' | 'happy' | 'energetic';
+  mood: MusicStyle;  // Primary category
+  categories?: MusicStyle[];  // Additional categories
   duration: number;
   tempo?: number;
   instruments?: string[];
@@ -153,13 +156,23 @@ export async function getSessions(limit = 20): Promise<Session[]> {
   return data;
 }
 
+export async function updateSessionMetrics(sessionId: string, metrics: any[]): Promise<any> {
+  const { data } = await apiClient.post(`/session/sessions/${sessionId}/metrics`, metrics);
+  return data;
+}
+
+export async function updateSessionNotes(sessionId: string, quickNotes: string): Promise<any> {
+  const { data } = await apiClient.post(`/session/sessions/${sessionId}/notes`, { quick_notes: quickNotes });
+  return data;
+}
+
 // Music Library
 export async function getMusicLibrary(): Promise<MusicTrack[]> {
   const { data } = await apiClient.get('/music/library');
   return data;
 }
 
-export async function getMusicByCategory(category: 'calm' | 'happy' | 'energetic'): Promise<MusicTrack[]> {
+export async function getMusicByCategory(category: MusicStyle): Promise<MusicTrack[]> {
   const { data } = await apiClient.get(`/music/category/${category}`);
   return data;
 }
@@ -375,6 +388,35 @@ export async function getMusicElements(childId: string) {
   return response.data;
 }
 
+// ==================== DOCUMENT API ====================
+
+export async function uploadProfileDocument(childId: string, file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await apiClient.post(
+    `/profile/child/${childId}/documents`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }
+  );
+  return response.data;
+}
+
+export async function getProfileDocuments(childId: string) {
+  const response = await apiClient.get(`/profile/child/${childId}/documents`);
+  return response.data;
+}
+
+export async function deleteProfileDocument(childId: string, blobPath: string) {
+  const encodedPath = encodeURIComponent(blobPath);
+  const response = await apiClient.delete(`/profile/child/${childId}/documents/${encodedPath}`);
+  return response.data;
+}
+
 // ==================== SESSION API (Updated) ====================
 
 export async function startSessionForChild(childId: string) {
@@ -412,7 +454,7 @@ export async function getDashboardAnalytics() {
 // ==================== MUSIC RECOMMENDATIONS API ====================
 
 export interface MusicRecommendation {
-  recommended_style: 'calm' | 'happy' | 'energetic';
+  recommended_style: MusicStyle;
   tempo_bpm: string;
   musical_key: string;
   mood: string;
@@ -459,6 +501,47 @@ export async function submitMusicFeedback(data: {
 
 export async function getMusicFeedbackHistory(childId: string, limit: number = 20) {
   const response = await apiClient.get(`/music/feedback/history/${childId}?limit=${limit}`);
+  return response.data;
+}
+
+// ==================== MUSIC RESPONSE METRICS API ====================
+
+export interface MusicResponseMetrics {
+  session_id: string;
+  child_id: string;
+  music_file: string;
+  music_style: MusicStyle;
+  duration_played: number;
+
+  // Binary Metrics
+  initiation: boolean | null;
+  response_to_prompt: boolean | null;
+  communication: boolean | null;
+  motor_movement: boolean | null;
+  aversion: boolean | null;
+
+  // Categorical Metrics
+  task_persistence: 'none' | 'partial' | 'majority' | 'full' | null;
+  rhythmic_sync: 'none' | 'brief' | 'continuous' | null;
+  emotion: 'disengaged' | 'neutral' | 'positive' | null;
+  deviance_from_typical: 'significantly_less' | 'somewhat_less' | 'typical' | 'somewhat_greater' | 'significantly_greater' | null;
+
+  // Notes
+  observer_notes: string;
+}
+
+export async function submitMusicResponseMetrics(data: MusicResponseMetrics) {
+  const response = await apiClient.post('/music-response/assess', data);
+  return response.data;
+}
+
+export async function getSessionMusicResponses(childId: string, sessionId: string) {
+  const response = await apiClient.get(`/music-response/child/${childId}/session/${sessionId}`);
+  return response.data;
+}
+
+export async function getAggregateMusicMetrics(childId: string, days: number = 30) {
+  const response = await apiClient.get(`/music-response/child/${childId}/aggregate?days=${days}`);
   return response.data;
 }
 
@@ -926,5 +1009,761 @@ export async function getNewAchievements(childId: string) {
 
 export async function markAchievementSeen(unlockId: string, childId: string) {
   const response = await apiClient.put(`/gamification/achievement/${unlockId}/mark-seen?child_id=${childId}`);
+  return response.data;
+}
+
+// ==================== FAVORITES API ====================
+
+export interface FavoriteSong {
+  id: string;
+  music_file: string;
+  music_style: MusicStyle;
+  date_added: string;
+  tags: string[];
+  play_count: number;
+  total_duration_played: number;
+  quality_scores: number[];
+  avg_quality_score?: number;
+  last_played: string | null;
+}
+
+export async function addToFavorites(data: {
+  child_id: string;
+  music_file: string;
+  music_style: MusicStyle;
+  context_tags?: string[];
+  quality_score?: number;
+}) {
+  const response = await apiClient.post(`/favorites/child/${data.child_id}/add`, {
+    music_file: data.music_file,
+    music_style: data.music_style,
+    context_tags: data.context_tags || [],
+    quality_score: data.quality_score
+  });
+  return response.data;
+}
+
+export async function getFavorites(childId: string) {
+  const response = await apiClient.get(`/favorites/child/${childId}`);
+  return response.data;
+}
+
+export async function removeFromFavorites(childId: string, favoriteId: string) {
+  const response = await apiClient.delete(`/favorites/child/${childId}/favorite/${favoriteId}`);
+  return response.data;
+}
+
+export async function trackFavoritePlay(data: {
+  child_id: string;
+  favorite_id: string;
+  duration: number;
+  quality_score?: number;
+}) {
+  const response = await apiClient.post(
+    `/favorites/child/${data.child_id}/favorite/${data.favorite_id}/track-play`,
+    {
+      duration: data.duration,
+      quality_score: data.quality_score
+    }
+  );
+  return response.data;
+}
+
+export async function updateFavoriteTags(data: {
+  child_id: string;
+  favorite_id: string;
+  tags: string[];
+}) {
+  const response = await apiClient.put(
+    `/favorites/child/${data.child_id}/favorite/${data.favorite_id}/tags`,
+    {
+      tags: data.tags
+    }
+  );
+  return response.data;
+}
+
+// ==================== FREEZE GAME API ====================
+
+export interface FreezeGameRound {
+  round_number?: number;
+  timestamp: string;
+  music_duration: number;
+  child_froze: boolean;
+  reaction_time?: number;
+  notes?: string;
+}
+
+export interface FreezeGameSummary {
+  game_id: string;
+  session_id: string;
+  child_id: string;
+  activity_type: 'freeze_game';
+  ended_at: string;
+  total_rounds: number;
+  successful_freezes: number;
+  success_rate: number;
+  total_duration: number;
+  overall_engagement: string;
+  notes?: string;
+  status: 'completed';
+}
+
+export async function startFreezeGame(data: {
+  session_id: string;
+  child_id: string;
+  music_style?: string;
+}) {
+  const response = await apiClient.post('/activities/freeze-game/start', {
+    session_id: data.session_id,
+    child_id: data.child_id,
+    music_style: data.music_style || 'calm'
+  });
+  return response.data;
+}
+
+export async function recordFreezeRound(data: {
+  game_id: string;
+  session_id: string;
+  music_duration: number;
+  child_froze: boolean;
+  reaction_time?: number;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/freeze-game/round', data);
+  return response.data;
+}
+
+export async function endFreezeGame(data: {
+  game_id: string;
+  session_id: string;
+  child_id: string;
+  total_rounds: number;
+  successful_freezes: number;
+  total_duration: number;
+  overall_engagement?: string;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/freeze-game/end', {
+    ...data,
+    overall_engagement: data.overall_engagement || 'moderate'
+  });
+  return response.data;
+}
+
+export async function getFreezeGameHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/activities/freeze-game/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: Sound Matching Game API Functions
+// ============================================
+
+export async function getSoundLibrary() {
+  const response = await apiClient.get('/activities/sound-matching/sounds');
+  return response.data;
+}
+
+export async function startSoundMatchingGame(data: {
+  session_id: string;
+  child_id: string;
+  category?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}) {
+  const response = await apiClient.post('/activities/sound-matching/start', {
+    session_id: data.session_id,
+    child_id: data.child_id,
+    category: data.category || 'instruments',
+    difficulty: data.difficulty || 'easy'
+  });
+  return response.data;
+}
+
+export async function recordSoundMatchingRound(data: {
+  game_id: string;
+  session_id: string;
+  target_sound: string;
+  selected_sound: string;
+  choices_shown: string[];
+  response_time: number;
+  was_correct: boolean;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/sound-matching/round', data);
+  return response.data;
+}
+
+export async function endSoundMatchingGame(data: {
+  game_id: string;
+  session_id: string;
+  child_id: string;
+  total_rounds: number;
+  correct_matches: number;
+  total_duration: number;
+  avg_response_time: number;
+  overall_engagement?: string;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/sound-matching/end', {
+    ...data,
+    overall_engagement: data.overall_engagement || 'moderate'
+  });
+  return response.data;
+}
+
+export async function getSoundMatchingHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/activities/sound-matching/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+export async function generateSoundRound(data: {
+  category: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  exclude_sounds?: string[];
+}) {
+  const response = await apiClient.post('/activities/sound-matching/generate-round', {
+    category: data.category,
+    difficulty: data.difficulty || 'easy',
+    exclude_sounds: data.exclude_sounds || []
+  });
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: Ambient Music API Functions
+// ============================================
+
+export async function getAmbientEnvironments() {
+  const response = await apiClient.get('/ambient-music/environments');
+  return response.data;
+}
+
+export async function startAmbientMusic(data: {
+  child_id: string;
+  session_id?: string;
+  environment?: string;
+  duration_minutes?: number;
+  custom_params?: { [key: string]: number };
+}) {
+  const response = await apiClient.post('/ambient-music/start', {
+    child_id: data.child_id,
+    session_id: data.session_id,
+    environment: data.environment || 'ocean',
+    duration_minutes: data.duration_minutes || 5,
+    custom_params: data.custom_params
+  });
+  return response.data;
+}
+
+export async function updateAmbientParameters(data: {
+  ambient_id: string;
+  child_id: string;
+  parameters: { [key: string]: number };
+}) {
+  const response = await apiClient.post('/ambient-music/update-parameters', data);
+  return response.data;
+}
+
+export async function stopAmbientMusic(data: {
+  ambient_id: string;
+  child_id: string;
+  regulation_effect?: string;
+  effectiveness?: number;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/ambient-music/stop', {
+    ...data,
+    regulation_effect: data.regulation_effect || 'calming',
+    effectiveness: data.effectiveness || 3
+  });
+  return response.data;
+}
+
+export async function getAmbientHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/ambient-music/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+export async function saveAmbientPreset(data: {
+  child_id: string;
+  preset_name: string;
+  environment_base: string;
+  custom_parameters: { [key: string]: number };
+}) {
+  const response = await apiClient.post('/ambient-music/save-preset', data);
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: Musical Storytelling API Functions
+// ============================================
+
+export async function getStoryLibrary() {
+  const response = await apiClient.get('/activities/storytelling/stories');
+  return response.data;
+}
+
+export async function getStoryDetails(storyId: string) {
+  const response = await apiClient.get(`/activities/storytelling/stories/${storyId}`);
+  return response.data;
+}
+
+export async function startStorytellingSession(data: {
+  session_id: string;
+  child_id: string;
+  story_id: string;
+  customization?: { [key: string]: any };
+}) {
+  const response = await apiClient.post('/activities/storytelling/start', data);
+  return response.data;
+}
+
+export async function completeStoryScene(data: {
+  storytelling_id: string;
+  session_id: string;
+  child_id: string;
+  scene_id: string;
+  participation_level?: 'high' | 'moderate' | 'low' | 'none';
+  child_response?: string;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/storytelling/scene-complete', {
+    ...data,
+    participation_level: data.participation_level || 'moderate'
+  });
+  return response.data;
+}
+
+export async function endStorytellingSession(data: {
+  storytelling_id: string;
+  session_id: string;
+  child_id: string;
+  overall_engagement?: string;
+  favorite_scene?: string;
+  therapeutic_notes?: string;
+}) {
+  const response = await apiClient.post('/activities/storytelling/end', {
+    ...data,
+    overall_engagement: data.overall_engagement || 'moderate'
+  });
+  return response.data;
+}
+
+export async function getStorytellingHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/activities/storytelling/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+export async function saveCustomStory(data: {
+  child_id: string;
+  story_title: string;
+  base_story_id: string;
+  customizations: { [key: string]: any };
+}) {
+  const response = await apiClient.post('/activities/storytelling/save-custom-story', data);
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: AI Music Recommendations API Functions
+// ============================================
+
+export async function getMusicRecommendations(data: {
+  child_id: string;
+  context: {
+    goal?: string;
+    time_of_day?: string;
+    mood?: string;
+    activity_type?: string;
+  };
+  limit?: number;
+  exclude_songs?: string[];
+}) {
+  const response = await apiClient.post('/recommendations/suggest', {
+    child_id: data.child_id,
+    context: data.context,
+    limit: data.limit || 5,
+    exclude_songs: data.exclude_songs || []
+  });
+  return response.data;
+}
+
+export async function getMusicInsights(childId: string) {
+  const response = await apiClient.get(`/recommendations/child/${childId}/insights`);
+  return response.data;
+}
+
+export async function recordRecommendationFeedback(childId: string, data: {
+  song_name: string;
+  was_played: boolean;
+  was_successful?: boolean;
+  quality_score?: number;
+  notes?: string;
+}) {
+  const response = await apiClient.post(`/recommendations/child/${childId}/feedback`, data);
+  return response.data;
+}
+
+export async function getLearningProgress(childId: string) {
+  const response = await apiClient.get(`/recommendations/child/${childId}/learning-progress`);
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: Movement Activities API Functions
+// ============================================
+
+export async function getMovementActivities() {
+  const response = await apiClient.get('/activities/movement/activities');
+  return response.data;
+}
+
+export async function getMovementActivityDetails(activityId: string) {
+  const response = await apiClient.get(`/activities/movement/activities/${activityId}`);
+  return response.data;
+}
+
+export async function startMovementActivity(data: {
+  session_id: string;
+  child_id: string;
+  activity_id: string;
+  modifications?: string[];
+}) {
+  const response = await apiClient.post('/activities/movement/start', {
+    ...data,
+    modifications: data.modifications || []
+  });
+  return response.data;
+}
+
+export async function completeMovement(data: {
+  movement_id: string;
+  session_id: string;
+  child_id: string;
+  movement_index: number;
+  participation?: 'full' | 'partial' | 'minimal' | 'refused';
+  quality?: 'excellent' | 'good' | 'fair' | 'needs_support';
+  modifications_needed?: string[];
+  notes?: string;
+}) {
+  const response = await apiClient.post('/activities/movement/movement-complete', {
+    ...data,
+    participation: data.participation || 'full',
+    quality: data.quality || 'good'
+  });
+  return response.data;
+}
+
+export async function endMovementActivity(data: {
+  movement_id: string;
+  session_id: string;
+  child_id: string;
+  overall_engagement?: string;
+  overall_quality?: string;
+  child_mood_after?: string;
+  therapeutic_notes?: string;
+}) {
+  const response = await apiClient.post('/activities/movement/end', {
+    ...data,
+    overall_engagement: data.overall_engagement || 'moderate',
+    overall_quality: data.overall_quality || 'good'
+  });
+  return response.data;
+}
+
+export async function getMovementHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/activities/movement/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+// ============================================
+// SPRINT 2: Emotion-Matching Music API Functions
+// ============================================
+
+export async function getEmotionProfiles() {
+  const response = await apiClient.get('/emotion-music/emotions');
+  return response.data;
+}
+
+export async function detectEmotion(data: {
+  child_id: string;
+  observed_emotion: string;
+  intensity?: number;
+  behavioral_indicators?: string[];
+  context?: string;
+}) {
+  const response = await apiClient.post('/emotion-music/detect-emotion', {
+    ...data,
+    intensity: data.intensity || 3
+  });
+  return response.data;
+}
+
+export async function startEmotionMusicSession(data: {
+  session_id: string;
+  child_id: string;
+  initial_emotion: string;
+  target_emotion?: string;
+  session_goal?: 'regulation' | 'maintenance' | 'exploration';
+}) {
+  const response = await apiClient.post('/emotion-music/start-session', {
+    ...data,
+    target_emotion: data.target_emotion || 'content',
+    session_goal: data.session_goal || 'regulation'
+  });
+  return response.data;
+}
+
+export async function recordEmotionCheck(data: {
+  emotion_session_id: string;
+  session_id: string;
+  child_id: string;
+  current_emotion: string;
+  intensity?: number;
+  behavioral_changes?: string[];
+  notes?: string;
+}) {
+  const response = await apiClient.post('/emotion-music/emotion-check', {
+    ...data,
+    intensity: data.intensity || 3
+  });
+  return response.data;
+}
+
+export async function endEmotionMusicSession(data: {
+  emotion_session_id: string;
+  session_id: string;
+  child_id: string;
+  final_emotion: string;
+  goal_achieved: boolean;
+  effectiveness?: number;
+  notes?: string;
+}) {
+  const response = await apiClient.post('/emotion-music/end-session', {
+    ...data,
+    effectiveness: data.effectiveness || 3
+  });
+  return response.data;
+}
+
+export async function getEmotionMusicHistory(childId: string, limit: number = 20) {
+  const response = await apiClient.get(`/emotion-music/child/${childId}/history?limit=${limit}`);
+  return response.data;
+}
+
+// ==================== TRACKING API ====================
+
+export interface MusicPlayLog {
+  child_id: string;
+  session_id?: string;
+  music_file: string;
+  music_title: string;
+  music_style: MusicStyle;
+  duration_played: number; // seconds
+  completed: boolean;
+  skipped: boolean;
+  replay: boolean;
+  context?: string;
+  goal?: string;
+  reaction?: string;
+}
+
+export interface ActivityUsageLog {
+  child_id: string;
+  session_id?: string;
+  activity_type: string;
+  activity_id: string;
+  activity_name: string;
+  duration_seconds: number;
+  completed: boolean;
+  participation_level?: string;
+  effectiveness_rating?: number;
+  context?: string;
+  metadata?: any;
+}
+
+export interface ResourceAccessLog {
+  child_id: string;
+  session_id?: string;
+  resource_type: string;
+  resource_id: string;
+  resource_name: string;
+  action: string;
+  duration_seconds?: number;
+  context?: string;
+}
+
+export async function logMusicPlay(data: MusicPlayLog) {
+  const response = await apiClient.post('/tracking/music-play', data);
+  return response.data;
+}
+
+export async function logActivityUsage(data: ActivityUsageLog) {
+  const response = await apiClient.post('/tracking/activity-usage', data);
+  return response.data;
+}
+
+export async function logResourceAccess(data: ResourceAccessLog) {
+  const response = await apiClient.post('/tracking/resource-access', data);
+  return response.data;
+}
+
+export async function getUsageHistory(childId: string, days: number = 30, logType?: string) {
+  const params = new URLSearchParams({ days: days.toString() });
+  if (logType) params.append('log_type', logType);
+  const response = await apiClient.get(`/tracking/child/${childId}/history?${params}`);
+  return response.data;
+}
+
+export async function getUsageAnalytics(childId: string, days: number = 30) {
+  const response = await apiClient.get(`/tracking/child/${childId}/analytics?days=${days}`);
+  return response.data;
+}
+
+// ==================== PLANNED SESSIONS API ====================
+
+export async function createPlannedSession(data: {
+  childId: string;
+  title: string;
+  scheduledDateTime: string;
+  status: string;
+  goals: string[];
+  activities: string[];
+  musicStyles: string[];
+  customPlaylist?: string;
+  notes: string;
+  duration: number;
+  isRecurring: boolean;
+  recurrencePattern?: string;
+}) {
+  const response = await apiClient.post('/planned-sessions', data);
+  return response.data;
+}
+
+export async function getPlannedSessions(childId?: string) {
+  const url = childId ? `/planned-sessions?childId=${childId}` : '/planned-sessions';
+  const response = await apiClient.get(url);
+  return response.data;
+}
+
+export async function getPlannedSession(sessionId: string) {
+  const response = await apiClient.get(`/planned-sessions/${sessionId}`);
+  return response.data;
+}
+
+export async function updatePlannedSession(sessionId: string, data: {
+  title?: string;
+  scheduledDateTime?: string;
+  status?: string;
+  goals?: string[];
+  activities?: string[];
+  musicStyles?: string[];
+  customPlaylist?: string;
+  notes?: string;
+  duration?: number;
+  isRecurring?: boolean;
+  recurrencePattern?: string;
+}) {
+  const response = await apiClient.put(`/planned-sessions/${sessionId}`, data);
+  return response.data;
+}
+
+export async function deletePlannedSession(sessionId: string) {
+  const response = await apiClient.delete(`/planned-sessions/${sessionId}`);
+  return response.data;
+}
+
+export async function getUpcomingPlannedSessions(childId: string) {
+  const response = await apiClient.get(`/planned-sessions/upcoming/${childId}`);
+  return response.data;
+}
+
+// ==================== SESSION TEMPLATES API ====================
+
+export interface SessionTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  goals: string[];
+  activities: string[];
+  musicStyles: string[];
+  notes?: string;
+  duration: number;
+  icon?: string;
+  color?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createSessionTemplate(data: {
+  name: string;
+  description?: string;
+  goals: string[];
+  activities: string[];
+  musicStyles: string[];
+  notes?: string;
+  duration: number;
+  icon?: string;
+  color?: string;
+}) {
+  const response = await apiClient.post('/templates', data);
+  return response.data;
+}
+
+export async function getSessionTemplates() {
+  const response = await apiClient.get('/templates');
+  return response.data;
+}
+
+export async function getSessionTemplate(templateId: string) {
+  const response = await apiClient.get(`/templates/${templateId}`);
+  return response.data;
+}
+
+export async function updateSessionTemplate(templateId: string, data: {
+  name?: string;
+  description?: string;
+  goals?: string[];
+  activities?: string[];
+  musicStyles?: string[];
+  notes?: string;
+  duration?: number;
+  icon?: string;
+  color?: string;
+}) {
+  const response = await apiClient.put(`/templates/${templateId}`, data);
+  return response.data;
+}
+
+export async function deleteSessionTemplate(templateId: string) {
+  const response = await apiClient.delete(`/templates/${templateId}`);
+  return response.data;
+}
+
+// ==================== AI SESSION PLANNER API ====================
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIPlannerChatResponse {
+  message: string;
+  suggestions: any | null;
+  isComplete: boolean;
+}
+
+export async function chatWithAIPlanner(
+  childId: string,
+  conversationHistory: ChatMessage[],
+  userMessage: string
+): Promise<AIPlannerChatResponse> {
+  const response = await apiClient.post('/ai-session-planner/chat', {
+    childId,
+    conversationHistory,
+    userMessage
+  });
   return response.data;
 }

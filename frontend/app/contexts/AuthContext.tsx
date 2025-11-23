@@ -10,6 +10,7 @@ interface User {
   email: string;
   name: string;
   phone?: string;
+  is_caregiver?: boolean;
 }
 
 interface AuthContextType {
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: response.email,
         name: response.name,
       });
-      toast.success(`Welcome back, ${response.name}! 👋`);
+      toast.success(`Welcome back, ${response.name}!`);
       router.push('/dashboard');
     } catch (error: any) {
       const message = error.response?.data?.detail || 'Login failed';

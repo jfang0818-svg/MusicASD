@@ -15,10 +15,15 @@ class EngagementLevel(str, Enum):
     HIGH = "HIGH"
 
 class MusicStyle(str, Enum):
-    """Valid music styles"""
-    CALM = "calm"
-    HAPPY = "happy"
-    ENERGETIC = "energetic"
+    """ASD-specific therapeutic music categories"""
+    CALMING_REGULATION = "calming_regulation"      # Meltdown prevention, self-regulation, transitions
+    FOCUS_ATTENTION = "focus_attention"            # Task engagement, concentration
+    SOCIAL_INTERACTIVE = "social_interactive"      # Turn-taking, joint attention, social skills
+    MOVEMENT_MOTOR = "movement_motor"              # Physical activity, gross motor skills
+    SENSORY_SEEKING = "sensory_seeking"            # For hypo-sensitive individuals needing stimulation
+    SENSORY_SOOTHING = "sensory_soothing"          # For hyper-sensitive individuals needing gentle input
+    SLEEP_REST = "sleep_rest"                      # Bedtime routines, relaxation
+    TRANSITION = "transition"                      # Activity changes, preparing for new activities
 
 class AudioMode(str, Enum):
     """Audio playback modes"""
@@ -54,22 +59,25 @@ class EngagementResponse(BaseModel):
 
 class MusicRequest(BaseModel):
     """Request to play music"""
-    style: MusicStyle
+    style: MusicStyle  # Primary style for playback
     volume: float = Field(default=0.7, ge=0.0, le=1.0)
     file: Optional[str] = None
+    categories: Optional[List[MusicStyle]] = None  # Multiple categories for the music file
 
     class Config:
         json_schema_extra = {
             "example": {
-                "style": "calm",
+                "style": "calming_regulation",
                 "volume": 0.7,
-                "file": "ocean_waves.mp3"
+                "file": "ocean_waves.mp3",
+                "categories": ["calming_regulation", "sensory_soothing"]
             }
         }
 
 class GenerateMusicRequest(BaseModel):
     """Request to generate synthetic music"""
-    style: MusicStyle = MusicStyle.CALM
+    style: MusicStyle = MusicStyle.CALMING_REGULATION
+    categories: Optional[List[MusicStyle]] = None  # Multiple categories for generated music
     duration: float = Field(default=5.0, ge=1.0, le=30.0)
     filename: str = Field(default="generated", max_length=50)
     tempo: int = Field(default=120, ge=60, le=200)
@@ -83,7 +91,8 @@ class GenerateMusicRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "style": "calm",
+                "style": "calming_regulation",
+                "categories": ["calming_regulation", "sleep_rest"],
                 "duration": 10.0,
                 "filename": "relaxing_tone",
                 "tempo": 80,
@@ -98,6 +107,7 @@ class MusicStatusResponse(BaseModel):
     position: int = 0
     volume: Optional[float] = None
     style: Optional[MusicStyle] = None
+    categories: Optional[List[MusicStyle]] = None
 
 class MusicLibraryResponse(BaseModel):
     """Music library information"""
@@ -123,7 +133,7 @@ class SessionLog(BaseModel):
                 "event": "Music Started",
                 "note": "Child showed interest in the melody",
                 "engagement": "MED",
-                "music_style": "calm"
+                "music_style": "calming_regulation"
             }
         }
 
@@ -205,7 +215,7 @@ class GPTSuggestion(BaseModel):
         json_schema_extra = {
             "example": {
                 "suggestion": "Try calming music to help regulate",
-                "style": "calm",
+                "style": "calming_regulation",
                 "phrase": "Let's listen to peaceful sounds",
                 "reasoning": "High engagement detected, calming music recommended"
             }
@@ -222,7 +232,7 @@ class CaregiverAction(BaseModel):
             "example": {
                 "action": "accepted",
                 "note": "Child responded well",
-                "modified_style": "calm"
+                "modified_style": "calming_regulation"
             }
         }
 
@@ -467,6 +477,8 @@ class MusicPreferences(BaseModel):
     disliked_music: Optional[List[str]] = Field(None, description="Music types that cause distress")
     successful_therapy_music: Optional[str] = Field(None, description="Music that has worked well in therapy")
     negative_reaction_music: Optional[str] = Field(None, description="Music that caused negative reactions")
+    custom_hello_song: Optional[str] = Field(None, description="Custom hello song filename for structured sessions")
+    custom_goodbye_song: Optional[str] = Field(None, description="Custom goodbye song filename for structured sessions")
 
     class Config:
         json_schema_extra = {
@@ -476,7 +488,9 @@ class MusicPreferences(BaseModel):
                 "preferred_tempo": "slow",
                 "disliked_music": ["heavy metal", "rap", "loud drums"],
                 "successful_therapy_music": "Mozart piano sonatas, ocean wave recordings",
-                "negative_reaction_music": "Fast-paced electronic music"
+                "negative_reaction_music": "Fast-paced electronic music",
+                "custom_hello_song": "alexs_welcome_song.mp3",
+                "custom_goodbye_song": "alexs_goodbye_song.mp3"
             }
         }
 
@@ -534,6 +548,27 @@ class ChildProfileUpdate(BaseModel):
     music_preferences: Optional[MusicPreferences] = None
     therapy_goals: Optional[TherapyGoals] = None
 
+class ProfileDocument(BaseModel):
+    """Document attached to a child profile"""
+    filename: str = Field(..., description="Original filename")
+    blob_path: str = Field(..., description="Blob storage path")
+    file_type: str = Field(..., description="MIME type")
+    file_size: int = Field(..., description="File size in bytes")
+    uploaded_at: datetime = Field(default_factory=datetime.now, description="Upload timestamp")
+    description: Optional[str] = Field(None, description="Optional document description")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "filename": "therapy_report.pdf",
+                "blob_path": "documents/user_123/child_456/therapy_report.pdf",
+                "file_type": "application/pdf",
+                "file_size": 102400,
+                "uploaded_at": "2025-01-20T10:00:00Z",
+                "description": "Initial assessment report"
+            }
+        }
+
 class ChildProfileResponse(BaseModel):
     """Child profile response"""
     id: str
@@ -544,8 +579,18 @@ class ChildProfileResponse(BaseModel):
     behavioral_patterns: Optional[BehavioralPatterns] = None
     music_preferences: Optional[MusicPreferences] = None
     therapy_goals: Optional[TherapyGoals] = None
+    documents: Optional[List[ProfileDocument]] = Field(default_factory=list, description="Attached documents")
     created_at: datetime
     updated_at: datetime
+
+class DocumentUploadResponse(BaseModel):
+    """Response after uploading a document"""
+    filename: str
+    blob_path: str
+    file_type: str
+    file_size: int
+    uploaded_at: datetime
+    message: str = "Document uploaded successfully"
 
 # ===================== MUSIC ELEMENT ANALYSIS =====================
 
@@ -581,3 +626,339 @@ class MusicElementsResponse(BaseModel):
     child_id: str
     elements: MusicElements
     analyzed_at: datetime
+
+# ===================== MUSIC RESPONSE METRICS MODELS =====================
+
+class TaskPersistence(str, Enum):
+    """Task persistence levels"""
+    NONE = "none"                    # Does not engage with the song
+    PARTIAL = "partial"              # Focused for some amount, not consistent
+    MAJORITY = "majority"            # Majority of song, with brief distractions
+    FULL = "full"                    # Continuously focused for entire duration
+
+class RhythmicSync(str, Enum):
+    """Rhythmic synchronization levels"""
+    NONE = "none"                    # Does not move rhythmically to the music
+    BRIEF = "brief"                  # Moves in time for >5 seconds
+    CONTINUOUS = "continuous"        # Continuously moves matching the beat
+
+class EmotionResponse(str, Enum):
+    """Emotional response to music"""
+    DISENGAGED = "disengaged"        # No affect, no participation
+    NEUTRAL = "neutral"              # No affect, maintains participation
+    POSITIVE = "positive"            # Smiling, laughing, singing along
+
+class EngagementDeviance(str, Enum):
+    """Deviance from typical engagement"""
+    SIGNIFICANTLY_LESS = "significantly_less"      # --
+    SOMEWHAT_LESS = "somewhat_less"                # -
+    TYPICAL = "typical"                            # =
+    SOMEWHAT_GREATER = "somewhat_greater"          # +
+    SIGNIFICANTLY_GREATER = "significantly_greater" # ++
+
+class MusicResponseMetricsCreate(BaseModel):
+    """Create music response metrics assessment"""
+    session_id: str = Field(..., description="Session ID this assessment belongs to")
+    child_id: str = Field(..., description="Child profile ID")
+    music_file: str = Field(..., description="Music file that was played")
+    music_style: MusicStyle = Field(..., description="Music style (calm/happy/energetic)")
+    duration_played: float = Field(..., ge=0.0, description="Duration music was played in seconds")
+
+    # Binary Metrics
+    initiation: Optional[bool] = Field(None, description="Did child initiate participation without prompting?")
+    response_to_prompt: Optional[bool] = Field(None, description="Did child follow given instructions/cues?")
+    communication: Optional[bool] = Field(None, description="Did child communicate (speak, signal, or nonverbal)?")
+    motor_movement: Optional[bool] = Field(None, description="Did child engage in purposeful movement to music?")
+    aversion: Optional[bool] = Field(None, description="Did child show signs of distress/aversion?")
+
+    # Categorical Metrics
+    task_persistence: Optional[TaskPersistence] = Field(None, description="How long child stayed engaged")
+    rhythmic_sync: Optional[RhythmicSync] = Field(None, description="Rhythmic synchronization level")
+    emotion: Optional[EmotionResponse] = Field(None, description="Emotional response shown")
+    deviance_from_typical: Optional[EngagementDeviance] = Field(None, description="Compared to typical engagement")
+
+    # Optional Notes
+    observer_notes: Optional[str] = Field(None, max_length=1000, description="Observer's notes and observations")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "session_20250120_abc123",
+                "child_id": "child_xyz789",
+                "music_file": "ocean_waves.mp3",
+                "music_style": "calming_regulation",
+                "duration_played": 180.5,
+                "initiation": True,
+                "response_to_prompt": True,
+                "communication": False,
+                "motor_movement": True,
+                "aversion": False,
+                "task_persistence": "majority",
+                "rhythmic_sync": "brief",
+                "emotion": "positive",
+                "deviance_from_typical": "somewhat_greater",
+                "observer_notes": "Child seemed very engaged, swaying gently to the music"
+            }
+        }
+
+class MusicResponseMetricsResponse(BaseModel):
+    """Music response metrics response"""
+    response_id: str
+    session_id: str
+    child_id: str
+    music_file: str
+    music_style: MusicStyle
+    duration_played: float
+    timestamp: datetime
+
+    # Binary Metrics
+    initiation: Optional[bool]
+    response_to_prompt: Optional[bool]
+    communication: Optional[bool]
+    motor_movement: Optional[bool]
+    aversion: Optional[bool]
+
+    # Categorical Metrics
+    task_persistence: Optional[TaskPersistence]
+    rhythmic_sync: Optional[RhythmicSync]
+    emotion: Optional[EmotionResponse]
+    deviance_from_typical: Optional[EngagementDeviance]
+
+    # Optional Notes
+    observer_notes: Optional[str]
+
+class MusicResponseAggregateMetrics(BaseModel):
+    """Aggregated music response metrics for a child"""
+    child_id: str
+    total_assessments: int
+    date_range: Dict[str, str]  # start_date, end_date
+
+    # Binary Metrics Percentages
+    initiation_rate: float = Field(..., description="Percentage of times child self-initiated")
+    response_to_prompt_rate: float = Field(..., description="Percentage of times child followed prompts")
+    communication_rate: float = Field(..., description="Percentage of times child communicated")
+    motor_movement_rate: float = Field(..., description="Percentage of times child showed motor movement")
+    aversion_rate: float = Field(..., description="Percentage of times child showed aversion")
+
+    # Categorical Metrics Averages (normalized 0-1)
+    avg_task_persistence: float = Field(..., description="Average task persistence score")
+    avg_rhythmic_sync: float = Field(..., description="Average rhythmic synchronization score")
+    avg_emotion: float = Field(..., description="Average emotional response score")
+    avg_deviance: float = Field(..., description="Average engagement deviance score")
+
+    # Overall Quality Score (0-100)
+    overall_quality_score: float = Field(..., description="Computed overall music response quality")
+
+    # By Music Style
+    metrics_by_style: Dict[str, Dict[str, Any]] = Field(..., description="Metrics broken down by music style")
+
+    # Best Performing Tracks
+    top_tracks: List[Dict[str, Any]] = Field(..., description="Top performing music tracks")
+
+class MusicResponseTrends(BaseModel):
+    """Music response trends over time"""
+    child_id: str
+    daily_metrics: List[Dict[str, Any]] = Field(..., description="Daily aggregated metrics")
+    trend_analysis: Dict[str, str] = Field(..., description="Trend analysis (improving/stable/declining)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "child_id": "child_xyz789",
+                "daily_metrics": [
+                    {
+                        "date": "2025-01-15",
+                        "assessments": 3,
+                        "quality_score": 75.5,
+                        "initiation_rate": 0.67,
+                        "communication_rate": 0.33
+                    }
+                ],
+                "trend_analysis": {
+                    "initiation": "improving",
+                    "communication": "stable",
+                    "overall_quality": "improving"
+                }
+            }
+        }
+
+# ===================== PLANNED SESSIONS MODELS =====================
+
+class PlannedSessionStatus(str, Enum):
+    """Planned session status values"""
+    UPCOMING = "upcoming"
+    COMPLETED = "completed"
+    MISSED = "missed"
+    TEMPLATE = "template"
+
+class RecurrencePattern(str, Enum):
+    """Recurrence pattern options"""
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    BIWEEKLY = "biweekly"
+    MONTHLY = "monthly"
+
+class PlannedSessionCreate(BaseModel):
+    """Create a new planned session"""
+    childId: str = Field(..., alias="childId")
+    title: str = Field(..., min_length=1, max_length=200)
+    scheduledDateTime: str = Field(..., alias="scheduledDateTime")
+    status: str = "upcoming"
+    goals: List[str] = Field(default_factory=list)
+    activities: List[str] = Field(default_factory=list)
+    musicStyles: List[str] = Field(default_factory=list, alias="musicStyles")
+    customPlaylist: Optional[str] = Field(None, alias="customPlaylist")
+    notes: str = ""
+    duration: int = Field(..., ge=5, le=180)
+    isRecurring: bool = Field(False, alias="isRecurring")
+    recurrencePattern: Optional[str] = Field(None, alias="recurrencePattern")
+
+    class Config:
+        populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "childId": "child_123",
+                "title": "Morning Routine Practice",
+                "scheduledDateTime": "2025-01-20T10:00:00Z",
+                "status": "upcoming",
+                "goals": ["Emotional Regulation", "Transitions"],
+                "activities": ["Sound Matching Game", "Musical Storytelling"],
+                "musicStyles": ["calming_regulation", "transition"],
+                "notes": "Focus on morning transitions",
+                "duration": 30,
+                "isRecurring": True,
+                "recurrencePattern": "weekly"
+            }
+        }
+
+class PlannedSessionUpdate(BaseModel):
+    """Update a planned session"""
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    scheduledDateTime: Optional[str] = Field(None, alias="scheduledDateTime")
+    status: Optional[str] = None
+    goals: Optional[List[str]] = None
+    activities: Optional[List[str]] = None
+    musicStyles: Optional[List[str]] = Field(None, alias="musicStyles")
+    customPlaylist: Optional[str] = Field(None, alias="customPlaylist")
+    notes: Optional[str] = None
+    duration: Optional[int] = Field(None, ge=5, le=180)
+    isRecurring: Optional[bool] = Field(None, alias="isRecurring")
+    recurrencePattern: Optional[str] = Field(None, alias="recurrencePattern")
+
+    class Config:
+        populate_by_name = True
+
+class PlannedSessionResponse(BaseModel):
+    """Planned session response"""
+    id: str
+    childId: str
+    title: str
+    scheduledDateTime: str
+    status: str
+    goals: List[str]
+    activities: List[str]
+    musicStyles: List[str]
+    customPlaylist: Optional[str]
+    notes: str
+    duration: int
+    isRecurring: bool
+    recurrencePattern: Optional[str]
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "session_abc123",
+                "childId": "child_123",
+                "title": "Morning Routine Practice",
+                "scheduledDateTime": "2025-01-20T10:00:00Z",
+                "status": "upcoming",
+                "goals": ["Emotional Regulation", "Transitions"],
+                "activities": ["Sound Matching Game"],
+                "musicStyles": ["calming_regulation", "transition"],
+                "customPlaylist": None,
+                "notes": "Focus on morning transitions",
+                "duration": 30,
+                "isRecurring": True,
+                "recurrencePattern": "weekly",
+                "createdAt": "2025-01-15T08:00:00Z",
+                "updatedAt": "2025-01-15T08:00:00Z"
+            }
+        }
+
+# ===================== SESSION TEMPLATE MODELS =====================
+
+class SessionTemplateCreate(BaseModel):
+    """Create a new session template"""
+    name: str = Field(..., min_length=1, max_length=200, description="Template name")
+    description: Optional[str] = Field(None, max_length=500, description="Template description")
+    goals: List[str] = Field(default_factory=list, description="Therapy goals")
+    activities: List[str] = Field(default_factory=list, description="Session activities")
+    musicStyles: List[str] = Field(default_factory=list, description="Music styles/categories")
+    notes: Optional[str] = Field(None, description="Additional notes")
+    duration: int = Field(30, ge=5, le=180, description="Duration in minutes")
+    icon: Optional[str] = Field(None, description="Emoji icon for template")
+    color: Optional[str] = Field(None, description="Color theme for template")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "My Custom Social Skills Session",
+                "description": "Interactive session for improving social interaction",
+                "goals": ["Turn-taking", "Eye contact", "Joint attention"],
+                "activities": ["Circle time", "Instrument passing", "Hello song"],
+                "musicStyles": ["social_interactive", "movement_motor"],
+                "notes": "Works well for ages 4-7",
+                "duration": 30,
+                "icon": "👥",
+                "color": "from-green-500 to-emerald-500"
+            }
+        }
+
+class SessionTemplateUpdate(BaseModel):
+    """Update a session template"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=500)
+    goals: Optional[List[str]] = None
+    activities: Optional[List[str]] = None
+    musicStyles: Optional[List[str]] = None
+    notes: Optional[str] = None
+    duration: Optional[int] = Field(None, ge=5, le=180)
+    icon: Optional[str] = None
+    color: Optional[str] = None
+
+class SessionTemplateResponse(BaseModel):
+    """Session template response"""
+    id: str
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    goals: List[str] = Field(default_factory=list)
+    activities: List[str] = Field(default_factory=list)
+    musicStyles: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    duration: int = 30
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "template_abc123",
+                "user_id": "user_xyz789",
+                "name": "My Custom Social Skills Session",
+                "description": "Interactive session for improving social interaction",
+                "goals": ["Turn-taking", "Eye contact", "Joint attention"],
+                "activities": ["Circle time", "Instrument passing", "Hello song"],
+                "musicStyles": ["social_interactive", "movement_motor"],
+                "notes": "Works well for ages 4-7",
+                "duration": 30,
+                "icon": "👥",
+                "color": "from-green-500 to-emerald-500",
+                "created_at": "2025-01-15T08:00:00Z",
+                "updated_at": "2025-01-15T08:00:00Z"
+            }
+        }

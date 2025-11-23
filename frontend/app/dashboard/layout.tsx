@@ -9,6 +9,7 @@ import {
   FileText,
   Settings,
   PlayCircle,
+  Calendar,
   Menu,
   X,
   Home,
@@ -20,7 +21,8 @@ import { cn } from '@/app/lib/utils';
 const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Live Session', href: '/dashboard/session', icon: PlayCircle },
-  { name: 'Music Library', href: '/dashboard/library', icon: Library },
+  { name: 'Session Plans', href: '/dashboard/plans', icon: Calendar },
+  { name: 'Libraries', href: '/dashboard/library', icon: Library },
   { name: 'Session Logs', href: '/dashboard/logs', icon: FileText },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
@@ -150,7 +152,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="pt-6 pr-6 pb-6 pl-4">
           {children}
         </main>
       </div>

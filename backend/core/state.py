@@ -23,7 +23,16 @@ class SessionState:
         # Music management
         self.current_music = None
         self.music_playing = False
-        self.music_library = {"calm": [], "happy": [], "energetic": []}
+        self.music_library = {
+            "calming_regulation": [],
+            "focus_attention": [],
+            "social_interactive": [],
+            "movement_motor": [],
+            "sensory_seeking": [],
+            "sensory_soothing": [],
+            "sleep_rest": [],
+            "transition": []
+        }
         self.generated_tones = []
 
         # Camera management
@@ -40,9 +49,14 @@ class SessionState:
             Path("data"),
             Path("logs"),
             Path("assets/music/generated"),
-            Path("assets/music/calm"),
-            Path("assets/music/happy"),
-            Path("assets/music/energetic"),
+            Path("assets/music/calming_regulation"),
+            Path("assets/music/focus_attention"),
+            Path("assets/music/social_interactive"),
+            Path("assets/music/movement_motor"),
+            Path("assets/music/sensory_seeking"),
+            Path("assets/music/sensory_soothing"),
+            Path("assets/music/sleep_rest"),
+            Path("assets/music/transition"),
             Path("cache/music")  # Cache for Azure music files
         ]
 
@@ -53,7 +67,16 @@ class SessionState:
 
     def scan_music_library(self):
         """Load music library from Azure Blob Storage"""
-        self.music_library = {"calm": [], "happy": [], "energetic": []}
+        self.music_library = {
+            "calming_regulation": [],
+            "focus_attention": [],
+            "social_interactive": [],
+            "movement_motor": [],
+            "sensory_seeking": [],
+            "sensory_soothing": [],
+            "sleep_rest": [],
+            "transition": []
+        }
 
         try:
             # Check if there's a running event loop
@@ -96,7 +119,8 @@ class SessionState:
         if not azure_storage.container_client:
             await azure_storage.initialize()
 
-        for category in ["calm", "happy", "energetic", "generated"]:
+        for category in ["calming_regulation", "focus_attention", "social_interactive", "movement_motor",
+                         "sensory_seeking", "sensory_soothing", "sleep_rest", "transition", "generated"]:
             music_files = await azure_storage.list_music_files(category)
 
             for file_info in music_files:
@@ -123,13 +147,17 @@ class SessionState:
                     "path": str(cache_path.absolute()),  # Local cache path
                     "blob_path": file_info["blob_path"],  # Azure path
                     "category": file_info["category"],
+                    "categories": file_info.get("categories", [file_info["category"]]),  # Multiple categories
                     "size": file_info["size"],
                     "cached": cache_path.exists(),  # Is it already cached?
                     "duration": 0.0  # Will be calculated when cached
                 }
 
-                self.music_library[target_category].append(music_entry)
-                logger.debug(f"Added: {file_info['name']} to {target_category} library (Azure)")
+                # Add music to all its categories
+                for cat in music_entry["categories"]:
+                    if cat in self.music_library:
+                        self.music_library[cat].append(music_entry)
+                        logger.debug(f"Added: {file_info['name']} to {cat} library (Azure)")
 
     async def ensure_music_cached(self, music_entry: dict) -> str:
         """Ensure music file is cached locally, download if needed"""

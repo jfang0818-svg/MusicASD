@@ -1,7 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipForward, Check } from 'lucide-react';
+import { Play, Pause, SkipForward, Check, Music2, Upload, Sparkles, Save } from 'lucide-react';
+import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { PhaseDefinition, SessionPhase } from '@/app/hooks/useSessionStructure';
 
 interface VisualScheduleProps {
@@ -17,6 +19,13 @@ interface VisualScheduleProps {
   onSkipToPhase: (phaseId: SessionPhase) => void;
   onPause: () => void;
   onResume: () => void;
+  onPlayPhaseMusic?: (phase: 'hello' | 'goodbye') => void;
+  getPhaseSongInfo?: (phase: 'hello' | 'goodbye') => string;
+  onUploadSong?: (file: File, phase: 'hello' | 'goodbye') => Promise<void>;
+  onAIGenerate?: (phase: 'hello' | 'goodbye') => void;
+  currentlyPlayingMusic?: string | null;
+  musicPlaying?: boolean;
+  onSaveAsDefault?: (phase: 'hello' | 'goodbye', filename: string) => Promise<void>;
 }
 
 export default function VisualSchedule({
@@ -32,6 +41,13 @@ export default function VisualSchedule({
   onSkipToPhase,
   onPause,
   onResume,
+  onPlayPhaseMusic,
+  getPhaseSongInfo,
+  onUploadSong,
+  onAIGenerate,
+  currentlyPlayingMusic,
+  musicPlaying,
+  onSaveAsDefault,
 }: VisualScheduleProps) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -153,15 +169,102 @@ export default function VisualSchedule({
               </div>
             </div>
 
+            {/* Now Playing - Show currently playing music */}
+            {currentlyPlayingMusic && musicPlaying && (currentPhase.id === 'hello' || currentPhase.id === 'goodbye') && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 mb-3 border border-green-200 dark:border-green-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">
+                      ▶️ Now Playing:
+                    </p>
+                    <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                      {currentlyPlayingMusic}
+                    </p>
+                  </div>
+                  {onSaveAsDefault && (
+                    <button
+                      onClick={() => {
+                        onSaveAsDefault(currentPhase.id as 'hello' | 'goodbye', currentlyPlayingMusic);
+                        toast.success(`Saved as default ${currentPhase.id} song`);
+                      }}
+                      className="ml-3 flex items-center gap-1 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-semibold transition-colors"
+                      title="Save as default song for this phase"
+                    >
+                      <Save className="h-3 w-3" />
+                      Save as Default
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Song Info - Show what will play for Hello/Goodbye */}
+            {onPlayPhaseMusic && getPhaseSongInfo && (currentPhase.id === 'hello' || currentPhase.id === 'goodbye') && (
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 mb-3 border border-purple-200 dark:border-purple-800">
+                <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1">
+                  🎵 Music for this phase:
+                </p>
+                <p className="text-sm text-purple-600 dark:text-purple-400">
+                  {getPhaseSongInfo(currentPhase.id as 'hello' | 'goodbye')}
+                </p>
+              </div>
+            )}
+
+            {/* Upload/AI Generate Buttons - Only for Hello/Goodbye phases */}
+            {(onUploadSong || onAIGenerate) && (currentPhase.id === 'hello' || currentPhase.id === 'goodbye') && (
+              <div className="flex gap-2 mb-3">
+                {onUploadSong && (
+                  <label className="flex-1 cursor-pointer">
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          onUploadSong(file, currentPhase.id as 'hello' | 'goodbye');
+                        }
+                      }}
+                    />
+                    <div className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg font-semibold text-sm transition-colors">
+                      <Upload className="h-4 w-4" />
+                      Upload Song
+                    </div>
+                  </label>
+                )}
+                {onAIGenerate && (
+                  <button
+                    onClick={() => onAIGenerate(currentPhase.id as 'hello' | 'goodbye')}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-3 py-2 rounded-lg font-semibold text-sm transition-all"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    AI Generate
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Control Buttons */}
             <div className="flex gap-2 mt-4">
+              {/* Play Music Button - Only show if no music is playing AND it's hello/goodbye phase */}
+              {onPlayPhaseMusic && !musicPlaying && (currentPhase.id === 'hello' || currentPhase.id === 'goodbye') && (
+                <button
+                  onClick={() => onPlayPhaseMusic(currentPhase.id as 'hello' | 'goodbye')}
+                  className="flex-1 flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+                >
+                  <Music2 className="h-4 w-4" />
+                  Play Music
+                </button>
+              )}
+
+              {/* Session Control: Pause/Resume Timer & Music */}
               {isPaused ? (
                 <button
                   onClick={onResume}
                   className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
                 >
                   <Play className="h-4 w-4" />
-                  Resume
+                  Resume{musicPlaying ? ' Session' : ''}
                 </button>
               ) : (
                 <button
@@ -169,7 +272,7 @@ export default function VisualSchedule({
                   className="flex-1 flex items-center justify-center gap-2 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
                 >
                   <Pause className="h-4 w-4" />
-                  Pause
+                  Pause{musicPlaying ? ' Session' : ''}
                 </button>
               )}
 

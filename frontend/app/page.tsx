@@ -3,8 +3,11 @@
 import Link from 'next/link';
 import { Sparkles, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from './contexts/AuthContext';
 
 export default function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 relative overflow-hidden">
       {/* Animated background blobs */}
@@ -66,18 +69,31 @@ export default function HomePage() {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center gap-3"
             >
-              <Link
-                href="/login"
-                className="text-white text-sm font-semibold hover:text-white/80 transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="bg-white text-indigo-600 font-bold text-sm px-5 py-2 rounded-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"
-              >
-                Get Started Free 🚀
-              </Link>
+              {!isLoading && (
+                isAuthenticated ? (
+                  <Link
+                    href="/dashboard"
+                    className="bg-white text-indigo-600 font-bold text-sm px-5 py-2 rounded-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"
+                  >
+                    Go to Dashboard
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      className="text-white text-sm font-semibold hover:text-white/80 transition-colors"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/register"
+                      className="bg-white text-indigo-600 font-bold text-sm px-5 py-2 rounded-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"
+                    >
+                      Get Started Free 🚀
+                    </Link>
+                  </>
+                )
+              )}
             </motion.div>
           </div>
         </div>
@@ -101,39 +117,54 @@ export default function HomePage() {
           </motion.div>
 
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg">
-            Music Therapy,
+            Music Therapy Platform
             <br />
             <span className="bg-gradient-to-r from-cyan-200 via-blue-200 to-purple-200 bg-clip-text text-transparent">
-              Reimagined ✨
+              Purpose-Built for Autism
             </span>
           </h1>
 
           <p className="text-base md:text-lg text-white/90 mb-8 max-w-3xl mx-auto drop-shadow-md">
-            AI-powered music therapy for ASD children. Real-time engagement tracking,
-            personalized recommendations, and data-driven insights 📊💙
+            Plan structured sessions, track real-time engagement, and measure therapeutic outcomes
+            with AI-assisted insights. Built specifically for music therapists working with children
+            on the autism spectrum.
           </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center"
-          >
-            <Link
-              href="/register"
-              className="bg-white text-indigo-600 font-bold text-base px-8 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+          {!isLoading && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="flex flex-col sm:flex-row gap-3 justify-center"
             >
-              <Sparkles className="w-5 h-5" />
-              Start Free Trial
-            </Link>
-            <Link
-              href="/login"
-              className="bg-white/20 backdrop-blur-md text-white font-bold text-base px-8 py-3 rounded-xl border-2 border-white/50 hover:bg-white/30 transition-all flex items-center justify-center gap-2"
-            >
-              <Zap className="w-5 h-5" />
-              Sign In
-            </Link>
-          </motion.div>
+              {isAuthenticated ? (
+                <Link
+                  href="/dashboard"
+                  className="bg-white text-indigo-600 font-bold text-base px-8 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="w-5 h-5" />
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/register"
+                    className="bg-white text-indigo-600 font-bold text-base px-8 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                    Start Free Trial
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="bg-white/20 backdrop-blur-md text-white font-bold text-base px-8 py-3 rounded-xl border-2 border-white/50 hover:bg-white/30 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-5 h-5" />
+                    Sign In
+                  </Link>
+                </>
+              )}
+            </motion.div>
+          )}
         </motion.div>
       </section>
 
@@ -145,7 +176,7 @@ export default function HomePage() {
           viewport={{ once: true }}
           className="text-3xl md:text-4xl font-bold text-center mb-3 text-white drop-shadow-lg"
         >
-          Why You'll Love It 💜
+          Complete Therapy Workflow
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -154,33 +185,60 @@ export default function HomePage() {
           transition={{ delay: 0.1 }}
           className="text-base text-white/80 text-center mb-8 max-w-2xl mx-auto"
         >
-          Everything you need for effective music therapy, powered by AI
+          From session planning to progress measurement—everything in one platform
         </motion.p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           <FeatureCard
-            icon="🧠"
-            title="AI-Powered Analysis"
-            description="Real-time emotion detection and engagement monitoring using GPT-5.1"
+            icon="📅"
+            title="Structured Sessions"
+            description="Visual schedules with hello songs, main activities, and goodbye songs. Custom phases with time tracking and smooth transitions."
             delay={0}
           />
           <FeatureCard
             icon="🎵"
-            title="Adaptive Music"
-            description="Dynamic music that responds to engagement levels in real-time"
+            title="8 Music Categories"
+            description="ASD-specific therapeutic music: calming/regulation, focus, social, movement, sensory seeking/soothing, sleep, and transitions."
             delay={0.1}
           />
           <FeatureCard
-            icon="👥"
-            title="Personalized Sessions"
-            description="Customized therapy sessions tailored to each child's unique needs"
+            icon="📊"
+            title="9-Point Assessment"
+            description="Track initiation, communication, motor movement, task persistence, rhythmic sync, emotion, and deviation from typical engagement."
             delay={0.2}
           />
           <FeatureCard
-            icon="📊"
-            title="Progress Tracking"
-            description="Comprehensive analytics and insights to monitor improvement"
+            icon="🤖"
+            title="AI Session Planner"
+            description="Chat with AI to plan sessions. Get evidence-based suggestions for goals, activities, and music based on child's profile and history."
             delay={0.3}
+          />
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+          <FeatureCard
+            icon="🎯"
+            title="Goal Tracking"
+            description="Set measurable therapy goals with baselines, targets, and progress milestones. Track improvement across emotional, social, sensory, and behavioral domains."
+            delay={0.4}
+          />
+          <FeatureCard
+            icon="🎮"
+            title="Interactive Activities"
+            description="Sound matching games, freeze dance, musical storytelling, emotion-matching music, and ambient soundscapes—all with engagement tracking."
+            delay={0.5}
+          />
+          <FeatureCard
+            icon="👤"
+            title="Comprehensive Profiles"
+            description="Document sensory sensitivities, communication abilities, behavioral patterns, music preferences, and upload assessment reports for each child."
+            delay={0.6}
+          />
+          <FeatureCard
+            icon="📈"
+            title="Progress Analytics"
+            description="30-day rolling analysis, trend detection, music effectiveness by style, top-performing tracks, and exportable session reports."
+            delay={0.7}
           />
         </div>
       </section>
@@ -194,9 +252,9 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="grid md:grid-cols-3 gap-8 text-center"
           >
-            <StatCard emoji="🎶" number="Unlimited" label="Music Tracks" delay={0} />
-            <StatCard emoji="😌" number="3" label="Mood Categories" delay={0.1} />
-            <StatCard emoji="⚡" number="Real-time" label="Engagement Tracking" delay={0.2} />
+            <StatCard emoji="🎶" number="8" label="Music Categories" delay={0} />
+            <StatCard emoji="📋" number="9" label="Assessment Metrics" delay={0.1} />
+            <StatCard emoji="⚡" number="Real-time" label="AI Suggestions" delay={0.2} />
           </motion.div>
         </div>
       </section>
@@ -210,24 +268,36 @@ export default function HomePage() {
           className="bg-white/20 backdrop-blur-lg rounded-3xl p-8 text-center border-2 border-white/30 shadow-2xl"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Ready to Transform Music Therapy? 🚀
+            Ready to Elevate Your Practice?
           </h2>
           <p className="text-base text-white/90 mb-6 max-w-2xl mx-auto">
-            Join therapists using AI-powered insights to provide better care
+            Join music therapists using SonicSoothe to deliver more effective,
+            data-informed interventions for children on the autism spectrum
           </p>
-          <Link
-            href="/register"
-            className="inline-block bg-white text-indigo-600 font-bold text-base px-10 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all"
-          >
-            Get Started Free - No Credit Card Required 💳
-          </Link>
+          {!isLoading && (
+            isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="inline-block bg-white text-indigo-600 font-bold text-base px-10 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/register"
+                className="inline-block bg-white text-indigo-600 font-bold text-base px-10 py-3 rounded-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all"
+              >
+                Get Started Free - No Credit Card Required 💳
+              </Link>
+            )
+          )}
         </motion.div>
       </section>
 
       {/* Footer */}
       <footer className="relative text-white/80 py-8 text-center border-t border-white/20">
         <p className="text-sm">
-          Made with 💙 for ASD therapy • Powered by GPT-5.1 & Azure
+          Supporting music therapists in autism spectrum care • Powered by AI & Azure
         </p>
       </footer>
     </div>

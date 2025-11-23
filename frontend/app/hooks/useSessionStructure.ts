@@ -24,7 +24,7 @@ export interface PhaseDefinition {
   durationMinutes: number;
   description: string;
   caregiverPrompt: string;
-  musicStyle?: 'calm' | 'happy' | 'energetic';
+  musicStyle?: 'calming_regulation' | 'focus_attention' | 'movement_motor';
   autoPlayMusic?: boolean;
 }
 
@@ -37,7 +37,7 @@ export const SESSION_PHASES: PhaseDefinition[] = [
     durationMinutes: 2,
     description: 'Welcome and greeting routine',
     caregiverPrompt: 'Greet your child by name. Make eye contact and sing along with the hello song.',
-    musicStyle: 'happy',
+    musicStyle: 'social_interactive',
     autoPlayMusic: true,
   },
   {
@@ -59,7 +59,7 @@ export const SESSION_PHASES: PhaseDefinition[] = [
     durationMinutes: 2,
     description: 'Closing and transition routine',
     caregiverPrompt: 'Signal the end of the session. Sing the goodbye song and prepare for the next activity.',
-    musicStyle: 'calm',
+    musicStyle: 'calming_regulation',
     autoPlayMusic: true,
   },
 ];

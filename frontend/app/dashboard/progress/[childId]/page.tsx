@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { getChildProfile, getChildProgressSummary, getGoalProgressTimeline, getSessionInsights } from '@/app/lib/api';
+import MusicResponseSummaryWidget from '@/app/components/MusicResponseSummaryWidget';
 
 export default function ChildProgressPage({ params }: { params: Promise<{ childId: string }> }) {
   const { childId } = use(params);
@@ -55,8 +56,8 @@ export default function ChildProgressPage({ params }: { params: Promise<{ childI
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 py-8 px-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 py-8">
+      <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -163,6 +164,9 @@ export default function ChildProgressPage({ params }: { params: Promise<{ childI
             </div>
           </motion.div>
         </div>
+
+        {/* Music Response Metrics Widget */}
+        <MusicResponseSummaryWidget childId={childId} days={30} />
 
         {/* Goal Progress Charts */}
         {goalTimeline && goalTimeline.goals.length > 0 && (

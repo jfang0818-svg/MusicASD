@@ -418,6 +418,11 @@ async def get_all_sessions(
     # Get sessions from Azure Blob Storage
     sessions = await azure_storage.list_user_sessions(user_id, limit)
 
+    # Map child_name to participantName for frontend compatibility
+    for session in sessions:
+        if "child_name" in session:
+            session["participantName"] = session["child_name"]
+
     # Sort by start_time descending (most recent first)
     sessions.sort(key=lambda x: x.get("start_time", ""), reverse=True)
 
@@ -451,6 +456,120 @@ async def get_child_sessions(
         "sessions": sessions,
         "total_sessions": len(sessions)
     }
+
+
+@router.post("/sessions/{session_id}/metrics")
+async def update_session_metrics(
+    session_id: str,
+    metrics: list = Body(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Update session metrics (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
+
+    try:
+        # Get session to verify ownership
+        session = await session_manager.get_session(session_id)
+        if not session:
+            # Try loading from Azure if not in Redis
+            session_data = await azure_storage.find_session_by_id(session_id)
+            if not session_data:
+                raise HTTPException(status_code=404, detail="Session not found")
+            session = session_data
+
+        # Verify ownership
+        if session.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - session belongs to another user"
+            )
+
+        # Update metrics
+        await session_manager.update_session(session_id, {"metrics": metrics})
+
+        # If session not in Redis (completed), update Azure directly
+        if not await session_manager.get_session(session_id):
+            session["metrics"] = metrics
+            await azure_storage.save_session(
+                session["child_id"],
+                session_id,
+                session
+            )
+
+        logger.info("Session %s metrics updated", session_id)
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "metrics_count": len(metrics)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update metrics: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update session metrics"
+        ) from e
+
+
+@router.post("/sessions/{session_id}/notes")
+async def update_session_notes(
+    session_id: str,
+    notes: dict = Body(...),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Update session quick notes (requires authentication)"""
+    user_id = auth_service.get_current_user_id(credentials)
+    session_manager = get_session_manager()
+
+    try:
+        # Get session to verify ownership
+        session = await session_manager.get_session(session_id)
+        if not session:
+            # Try loading from Azure if not in Redis
+            session_data = await azure_storage.find_session_by_id(session_id)
+            if not session_data:
+                raise HTTPException(status_code=404, detail="Session not found")
+            session = session_data
+
+        # Verify ownership
+        if session.get("user_id") != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied - session belongs to another user"
+            )
+
+        quick_notes = notes.get("quick_notes", "")
+
+        # Update quick notes
+        await session_manager.update_session(session_id, {"quick_notes": quick_notes})
+
+        # If session not in Redis (completed), update Azure directly
+        if not await session_manager.get_session(session_id):
+            session["quick_notes"] = quick_notes
+            await azure_storage.save_session(
+                session["child_id"],
+                session_id,
+                session
+            )
+
+        logger.info("Session %s quick notes updated", session_id)
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "notes_length": len(quick_notes)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update notes: %s", str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update session notes"
+        ) from e
 
 
 @router.delete("/sessions/{session_id}")

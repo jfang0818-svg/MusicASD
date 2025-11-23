@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Sparkles, Music, Clock, Key, Volume2, TrendingDown, AlertCircle, RefreshCw, TrendingUp, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import MusicResponseSummaryWidget from '@/app/components/MusicResponseSummaryWidget';
 
 export default function ProfileAnalysisPage() {
   const params = useParams();
@@ -253,6 +254,15 @@ export default function ProfileAnalysisPage() {
             )}
           </motion.div>
         ) : null}
+
+        {/* Music Response Metrics Widget */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <MusicResponseSummaryWidget childId={childId} days={30} />
+        </motion.div>
 
         {/* Music Effectiveness Insights (from real session data) */}
         {musicEffectiveness && musicEffectiveness.total_sessions_analyzed > 0 && (
