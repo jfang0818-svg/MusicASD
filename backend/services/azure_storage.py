@@ -414,6 +414,30 @@ class AzureStorageService:
             print(f"Error downloading file {blob_path}: {e}")
             return None
 
+    # Generic JSON operations for activity templates and other data
+    async def upload_json(self, blob_path: str, data: Dict[str, Any]) -> bool:
+        """Upload JSON data to blob storage"""
+        return await self._save_json(blob_path, data)
+
+    async def download_json(self, blob_path: str) -> Optional[Dict[str, Any]]:
+        """Download JSON data from blob storage"""
+        return await self._load_json(blob_path)
+
+    async def delete_blob(self, blob_path: str) -> bool:
+        """Delete a blob from storage"""
+        return await self._delete_blob(blob_path)
+
+    async def list_blobs_in_path(self, path_prefix: str) -> List[str]:
+        """List all blobs in a path prefix"""
+        try:
+            blobs = []
+            async for blob in self.container_client.list_blobs(name_starts_with=path_prefix):
+                blobs.append(blob.name)
+            return blobs
+        except Exception as e:
+            print(f"Error listing blobs in {path_prefix}: {e}")
+            return []
+
     async def get_file_url(self, blob_path: str, expiry_hours: int = 24) -> Optional[str]:
         """Get a temporary SAS URL for accessing a file"""
         # TODO: Implement SAS token generation for secure temporary access

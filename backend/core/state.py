@@ -119,10 +119,17 @@ class SessionState:
         if not azure_storage.container_client:
             await azure_storage.initialize()
 
-        for category in ["calming_regulation", "focus_attention", "social_interactive", "movement_motor",
-                         "sensory_seeking", "sensory_soothing", "sleep_rest", "transition", "generated"]:
-            music_files = await azure_storage.list_music_files(category)
+        # Parallelize loading from all categories
+        categories = ["calming_regulation", "focus_attention", "social_interactive", "movement_motor",
+                     "sensory_seeking", "sensory_soothing", "sleep_rest", "transition", "generated"]
 
+        # Load all categories in parallel using asyncio.gather
+        all_music_files = await asyncio.gather(
+            *[azure_storage.list_music_files(category) for category in categories]
+        )
+
+        # Process results from all categories
+        for music_files in all_music_files:
             for file_info in music_files:
                 # Determine target category (generated files may be categorized)
                 target_category = file_info["category"]

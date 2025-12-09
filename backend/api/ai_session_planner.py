@@ -55,14 +55,13 @@ async def chat_with_planner(
             raise HTTPException(status_code=404, detail="Child profile not found")
 
         # Get session history
-        sessions = await azure_storage.get_session_logs(user_id, request.childId)
+        sessions = await azure_storage.list_child_sessions(request.childId)
 
-        # Get current goals
-        goals_data = await azure_storage.get_child_goals(user_id, request.childId)
-        current_goals = goals_data.get("goals", []) if goals_data else []
+        # Get current goals from profile
+        current_goals = profile.get("therapy_goals", {}).get("goals", [])
 
-        # Get music response data
-        music_responses = await azure_storage.get_music_responses(user_id, request.childId)
+        # Music responses not tracked separately - use empty list for now
+        music_responses = []
 
         # Build context for AI
         context = _build_planning_context(

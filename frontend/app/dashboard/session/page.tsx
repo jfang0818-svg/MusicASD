@@ -25,9 +25,11 @@ import AIMusicGenerationModal from '@/app/components/AIMusicGenerationModal';
 import { useAnalysisWebSocket } from '@/app/hooks/useAnalysisWebSocket';
 import { useAdaptiveMusic } from '@/app/hooks/useAdaptiveMusic';
 import AdaptiveMusicNotification from '@/app/components/session/AdaptiveMusicNotification';
-import { useSessionStructure, SessionPhase, SESSION_PHASES } from '@/app/hooks/useSessionStructure';
+import { useSessionStructure, SessionPhase, SESSION_PHASES, CoreActivity, CORE_ACTIVITIES } from '@/app/hooks/useSessionStructure';
 import VisualSchedule from '@/app/components/session/VisualSchedule';
 import TransitionWarning from '@/app/components/session/TransitionWarning';
+import CoreActivitySelector from '@/app/components/session/CoreActivitySelector';
+import ActivityProgress from '@/app/components/session/ActivityProgress';
 import QuickGoalTracker from '@/app/components/session/QuickGoalTracker';
 import { useParentCoaching } from '@/app/hooks/useParentCoaching';
 import ParentCoachingPanel from '@/app/components/session/ParentCoachingPanel';
@@ -200,12 +202,22 @@ function SessionContent() {
     { enabled: analysisEnabled && autoAdaptEnabled }
   );
 
+  // State for showing activity selector
+  const [showingActivitySelector, setShowingActivitySelector] = useState(false);
+
   // Feature 2: Session Structure hook
   const sessionStructure = useSessionStructure({
     enabled: sessionActive && sessionStructureEnabled,
     onPhaseChange: async (phase: SessionPhase) => {
       console.log('🎵 Phase changed to:', phase);
-      // Music is now controlled manually via play buttons - no auto-play
+
+      // When entering activity phase, show activity selector
+      if (phase === 'activity') {
+        setShowingActivitySelector(true);
+      } else {
+        setShowingActivitySelector(false);
+      }
+
       toast(`📍 ${phase.charAt(0).toUpperCase() + phase.slice(1)} phase started`, {
         icon: phase === 'hello' ? '👋' : phase === 'goodbye' ? '🌙' : '🎯',
         duration: 3000
@@ -217,7 +229,24 @@ function SessionContent() {
     onSessionComplete: () => {
       toast.success('Structured session complete! 🎉');
     },
+    onActivityChange: (activity: CoreActivity) => {
+      console.log('🎯 Activity changed to:', activity.name);
+      toast(`Starting: ${activity.name} ${activity.icon}`, {
+        duration: 2000
+      });
+    },
+    onActivityComplete: (activity: CoreActivity) => {
+      console.log('Activity completed:', activity.name);
+    },
   });
+
+  // Handle activity selection confirm
+  const handleActivitiesConfirm = (activities: CoreActivity[]) => {
+    sessionStructure.configureActivities(activities);
+    sessionStructure.startFirstActivity();
+    setShowingActivitySelector(false);
+    toast.success(`Starting ${activities.length} activities!`);
+  };
 
   // Feature 4: Parent Coaching hook
   const {
@@ -1127,7 +1156,7 @@ function SessionContent() {
           />
         )}
 
-        {/* Feature 2: Transition Warning */}
+        {/* Feature 2: Transition Warning - for phases and activities */}
         {sessionActive && sessionStructureEnabled && sessionStructure.showingTransitionWarning && (
           <TransitionWarning
             show={sessionStructure.showingTransitionWarning}
@@ -1135,6 +1164,10 @@ function SessionContent() {
             nextPhase={sessionStructure.allPhases[sessionStructure.currentPhaseIndex + 1]}
             remainingSeconds={sessionStructure.remainingSeconds}
             onDismiss={sessionStructure.dismissTransitionWarning}
+            // Activity-specific props
+            currentActivity={sessionStructure.currentActivity}
+            nextActivity={sessionStructure.selectedActivities[sessionStructure.currentActivityIndex + 1]}
+            isActivityTransition={sessionStructure.currentPhase?.id === 'activity' && !!sessionStructure.currentActivity}
           />
         )}
 
@@ -1143,8 +1176,8 @@ function SessionContent() {
         <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-240px)]">
           {/* Left Column - Session Structure & AI Assistant & Engagement */}
           <div className="flex flex-col gap-6 h-full overflow-y-auto">
-            {/* Feature 2: Visual Schedule */}
-            {sessionStructureEnabled && !sessionStructure.isComplete && (
+            {/* Feature 2: Visual Schedule - Show for Hello/Goodbye phases */}
+            {sessionStructureEnabled && !sessionStructure.isComplete && sessionStructure.currentPhase?.id !== 'activity' && (
               <VisualSchedule
                 allPhases={sessionStructure.allPhases}
                 currentPhase={sessionStructure.currentPhase}
@@ -1165,6 +1198,44 @@ function SessionContent() {
                 currentlyPlayingMusic={currentMusic}
                 musicPlaying={musicPlaying}
                 onSaveAsDefault={handleSaveAsDefault}
+              />
+            )}
+
+            {/* Core Activity Selector - Show when entering activity phase */}
+            {sessionStructureEnabled && showingActivitySelector && sessionStructure.currentPhase?.id === 'activity' && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+                <CoreActivitySelector
+                  onConfirm={handleActivitiesConfirm}
+                  onCancel={() => {
+                    // Skip to goodbye if they cancel
+                    sessionStructure.skipToPhase('goodbye');
+                    setShowingActivitySelector(false);
+                  }}
+                  childName={selectedChild?.demographics?.name}
+                />
+              </div>
+            )}
+
+            {/* Activity Progress - Show during active activities */}
+            {sessionStructureEnabled &&
+             sessionStructure.currentPhase?.id === 'activity' &&
+             sessionStructure.currentActivity &&
+             !showingActivitySelector && (
+              <ActivityProgress
+                currentActivity={sessionStructure.currentActivity}
+                currentIndex={sessionStructure.currentActivityIndex}
+                totalActivities={sessionStructure.selectedActivities.length}
+                selectedActivities={sessionStructure.selectedActivities}
+                elapsedSeconds={sessionStructure.activityElapsedSeconds}
+                remainingSeconds={sessionStructure.remainingSeconds}
+                progressPercent={sessionStructure.progressPercent}
+                isPaused={sessionStructure.isPaused}
+                onNextActivity={sessionStructure.nextActivity}
+                onPause={handleSessionPause}
+                onResume={handleSessionResume}
+                onSkipToActivity={(id) => sessionStructure.skipToActivity(id as any)}
+                musicStyle={currentStyle}
+                onPlayMusic={(style) => handlePlayMusic(style as any)}
               />
             )}
             {/* AI Therapy Assistant Card */}

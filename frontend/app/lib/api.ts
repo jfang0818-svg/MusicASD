@@ -1767,3 +1767,148 @@ export async function chatWithAIPlanner(
   });
   return response.data;
 }
+
+// ===================== AI Activity Generator =====================
+
+export interface ActivityPhase {
+  phase_number: number;
+  name: string;
+  duration_seconds: number;
+  description: string;
+  caregiver_instruction: string;
+  music_cue?: string;
+  visual_support?: string;
+  adaptations?: Record<string, string>;
+}
+
+export interface TherapeuticGoal {
+  goal: string;
+  description: string;
+  evidence_base?: string;
+}
+
+export interface SensoryRequirements {
+  auditory_intensity: 'low' | 'moderate' | 'high' | 'variable';
+  visual_intensity: 'low' | 'moderate' | 'high' | 'variable';
+  tactile_involvement: boolean;
+  movement_required: boolean;
+  warnings: string[];
+}
+
+export interface MaterialItem {
+  name: string;
+  required: boolean;
+  alternatives: string[];
+}
+
+export interface ActivityTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: 'rhythmic' | 'social' | 'sensory' | 'communication' | 'emotional' | 'cognitive';
+  subcategory: string;
+  tags: string[];
+  primary_goals: TherapeuticGoal[];
+  secondary_goals: TherapeuticGoal[];
+  phases: ActivityPhase[];
+  total_duration_minutes: number;
+  difficulty_levels: string[];
+  min_age: number;
+  max_age: number;
+  sensory_requirements: SensoryRequirements;
+  music_style: string;
+  tempo_bpm: number;
+  volume_level: string;
+  min_participants: number;
+  max_participants: number;
+  participant_roles: string[];
+  setup_instructions: string;
+  caregiver_tips: string[];
+  adaptation_suggestions: string[];
+  warning_signs: string[];
+  materials: MaterialItem[];
+  created_at: string;
+  source_child_id?: string;
+}
+
+export interface GenerateActivityRequest {
+  child_id?: string;
+  category?: string;
+  therapeutic_goals: string[];
+  duration_minutes: number;
+  difficulty: 'introductory' | 'beginner' | 'intermediate' | 'advanced';
+  sensory_considerations?: string;
+  available_materials: string[];
+  additional_context?: string;
+}
+
+export interface GenerateActivityResponse {
+  activity: ActivityTemplate;
+  reasoning: string;
+  alternatives: string[];
+}
+
+export interface ActivityChatResponse {
+  message: string;
+  activity: ActivityTemplate | null;
+  follow_up_questions: string[];
+  is_complete: boolean;
+}
+
+export async function generateActivity(
+  request: GenerateActivityRequest
+): Promise<GenerateActivityResponse> {
+  const response = await apiClient.post('/ai-activity-generator/generate', request);
+  return response.data;
+}
+
+export async function chatWithActivityWizard(
+  childId: string | null,
+  conversationHistory: ChatMessage[],
+  userMessage: string
+): Promise<ActivityChatResponse> {
+  const response = await apiClient.post('/ai-activity-generator/chat', {
+    child_id: childId,
+    conversation_history: conversationHistory,
+    user_message: userMessage
+  });
+  return response.data;
+}
+
+export async function saveActivityTemplate(
+  activity: ActivityTemplate,
+  saveAsGlobal: boolean = true
+): Promise<{ success: boolean; activity_id: string }> {
+  const response = await apiClient.post('/ai-activity-generator/save', {
+    activity,
+    save_as_global: saveAsGlobal
+  });
+  return response.data;
+}
+
+export async function listActivityTemplates(
+  category?: string,
+  limit: number = 20
+): Promise<{ activities: ActivityTemplate[]; total: number }> {
+  const params = new URLSearchParams();
+  if (category) params.append('category', category);
+  params.append('limit', limit.toString());
+
+  const response = await apiClient.get(`/ai-activity-generator/templates?${params.toString()}`);
+  return response.data;
+}
+
+export async function getActivityTemplate(
+  activityId: string
+): Promise<ActivityTemplate> {
+  const response = await apiClient.get(`/ai-activity-generator/templates/${activityId}`);
+  return response.data;
+}
+
+export async function deleteActivityTemplate(
+  activityId: string
+): Promise<{ success: boolean }> {
+  const response = await apiClient.delete(`/ai-activity-generator/templates/${activityId}`);
+  return response.data;
+}
