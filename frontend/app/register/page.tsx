@@ -197,7 +197,7 @@ export default function RegisterPage() {
                 </div>
               </motion.div>
               <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-600 to-indigo-600 bg-clip-text text-transparent group-hover:from-cyan-500 group-hover:to-indigo-500 transition-all">
-                Join SonicSoothe
+                Join MusicASD
               </h1>
             </Link>
             <p className="text-gray-600 mt-2">Start your music therapy journey</p>

@@ -2,12 +2,14 @@
 MusicGen Service - AI Music Generation using Meta's MusicGen
 """
 import logging
-import torch
-import scipy.io.wavfile as wavfile
-import numpy as np
-from pathlib import Path
-from typing import Optional, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import numpy as np
+import scipy.io.wavfile as wavfile
+import torch
+
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -37,7 +39,9 @@ class MusicGenService:
         try:
             from transformers import MusicgenForConditionalGeneration, AutoProcessor
 
-            logger.info(f"Loading MusicGen model: {self.model_size} on {self.device}")
+            logger.info(
+                "Loading MusicGen model: %s on %s", self.model_size, self.device
+            )
 
             # Load the model from HuggingFace
             model_name = f"facebook/musicgen-{self.model_size}"
@@ -56,11 +60,11 @@ class MusicGenService:
             return True
 
         except ImportError as e:
-            logger.error(f"Failed to import transformers: {e}")
+            logger.error("Failed to import transformers: %s", e)
             logger.error("Install with: pip install transformers torch scipy")
             return False
         except Exception as e:
-            logger.error(f"Failed to initialize MusicGen: {e}")
+            logger.error("Failed to initialize MusicGen: %s", e)
             return False
 
     def get_status(self) -> Dict[str, Any]:
@@ -161,12 +165,14 @@ class MusicGenService:
             await self.initialize()
 
         if not self.initialized:
-            raise RuntimeError("MusicGen not initialized. Check dependencies and configuration.")
+            raise RuntimeError(
+                "MusicGen not initialized. Check dependencies and configuration."
+            )
 
         try:
             # Build descriptive prompt
             prompt = self._build_prompt(style, mood, complexity, child_context)
-            logger.info(f"MusicGen prompt: {prompt}")
+            logger.info("MusicGen prompt: %s", prompt)
 
             # Process inputs
             inputs = self.processor(
@@ -184,7 +190,7 @@ class MusicGenService:
             max_new_tokens = int(min(duration, settings.MAX_GENERATED_DURATION) * 50)
 
             # Generate music
-            logger.info(f"Generating {duration}s of music...")
+            logger.info("Generating %ss of music...", duration)
             with torch.no_grad():  # Disable gradient computation for inference
                 audio_values = self.model.generate(
                     **inputs,
@@ -219,7 +225,7 @@ class MusicGenService:
                 audio_normalized
             )
 
-            logger.info(f"✓ Music generated: {output_path} ({duration}s)")
+            logger.info("Music generated: %s (%ss)", output_path, duration)
 
             return {
                 "file_path": str(output_path.absolute()),
@@ -235,8 +241,8 @@ class MusicGenService:
             }
 
         except Exception as e:
-            logger.error(f"MusicGen generation failed: {e}")
-            raise RuntimeError(f"Failed to generate music: {str(e)}")
+            logger.error("MusicGen generation failed: %s", e)
+            raise RuntimeError(f"Failed to generate music: {e!s}") from e
 
     async def cleanup(self):
         """Clean up resources"""

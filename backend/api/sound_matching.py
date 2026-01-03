@@ -2,13 +2,14 @@
 Sound Matching Game API endpoints
 Interactive game for auditory processing and matching skills
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
+import logging
+import random
+import uuid
 from datetime import datetime
 from typing import List, Optional
-import logging
-import uuid
-import random
+
+from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -91,7 +92,10 @@ async def start_sound_matching_game(
 
     # Validate category
     if category not in SOUND_LIBRARY:
-        raise HTTPException(status_code=400, detail=f"Invalid category. Choose from: {list(SOUND_LIBRARY.keys())}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid category. Choose from: {list(SOUND_LIBRARY.keys())}"
+        )
 
     # Create game
     game_id = f"sound_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
@@ -120,7 +124,7 @@ async def start_sound_matching_game(
         "difficulty": difficulty
     })
 
-    logger.info(f"Started sound matching game {game_id} for session {session_id}")
+    logger.info("Started sound matching game %s for session %s", game_id, session_id)
 
     return {
         "status": "started",
@@ -185,7 +189,7 @@ async def record_sound_matching_round(
         "result": "correct" if was_correct else "incorrect"
     })
 
-    logger.info(f"Recorded sound matching round for game {game_id}: {was_correct}")
+    logger.info("Recorded sound matching round for game %s: %s", game_id, was_correct)
 
     return {
         "status": "recorded",
@@ -260,7 +264,9 @@ async def end_sound_matching_game(
         "notes": notes
     })
 
-    logger.info(f"Ended sound matching game {game_id}: {correct_matches}/{total_rounds} correct")
+    logger.info(
+        "Ended sound matching game %s: %s/%s correct", game_id, correct_matches, total_rounds
+    )
 
     return {
         "status": "completed",
@@ -287,7 +293,7 @@ async def get_sound_matching_history(
 
     # List all games
     prefix = f"activities/sound_matching/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     games = []
     for blob_name in blob_names[:limit]:

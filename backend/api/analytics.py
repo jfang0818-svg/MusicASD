@@ -1,11 +1,13 @@
 """
 Analytics API endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-import logging
+
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from services.auth import auth_service
 from services.azure_storage import azure_storage
 
@@ -98,7 +100,10 @@ async def get_dashboard_analytics(
                         day_engagement_sum += engagement_scores.get(log["engagement"], 66)
                         day_engagement_count += 1
 
-            avg_day_engagement = int(day_engagement_sum / day_engagement_count) if day_engagement_count > 0 else 0
+            avg_day_engagement = (
+                int(day_engagement_sum / day_engagement_count)
+                if day_engagement_count > 0 else 0
+            )
 
             engagement_trends.append({
                 "date": date_str,
@@ -124,7 +129,7 @@ async def get_dashboard_analytics(
         }
 
     except Exception as e:
-        logger.error(f"Analytics error: {e}")
+        logger.error("Analytics error: %s", e)
         # Return empty data on error instead of mock data
         return {
             "totalSessions": 0,
@@ -149,11 +154,11 @@ async def get_session_analytics(
         all_sessions = await azure_storage.list_user_sessions(user_id, limit=1000)
 
         # Debug logging
-        logger.info(f"Looking for session_id: {session_id}")
-        logger.info(f"Found {len(all_sessions)} sessions for user")
+        logger.info("Looking for session_id: %s", session_id)
+        logger.info("Found %d sessions for user", len(all_sessions))
         if all_sessions:
-            logger.info(f"Sample session keys: {list(all_sessions[0].keys())}")
-            logger.info(f"Sample session id field: {all_sessions[0].get('id')}")
+            logger.info("Sample session keys: %s", list(all_sessions[0].keys()))
+            logger.info("Sample session id field: %s", all_sessions[0].get('id'))
 
         session = next((s for s in all_sessions if s.get("id") == session_id), None)
 
@@ -204,11 +209,11 @@ async def get_session_analytics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get session analytics: {e}")
+        logger.error("Failed to get session analytics: %s", e)
         raise HTTPException(
             status_code=500,
             detail="Failed to retrieve session analytics"
-        )
+        ) from e
 
 @router.get("/analytics/export")
 async def export_analytics(
@@ -325,8 +330,10 @@ async def analyze_music_effectiveness(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Music effectiveness analysis error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to analyze music effectiveness")
+        logger.error("Music effectiveness analysis error: %s", e)
+        raise HTTPException(
+            status_code=500, detail="Failed to analyze music effectiveness"
+        ) from e
 
 
 def generate_music_insights(ranked: List[Dict], child_name: str, total_sessions: int) -> str:
@@ -341,29 +348,57 @@ def generate_music_insights(ranked: List[Dict], child_name: str, total_sessions:
 
     # Best performing style
     if best_style["avg_engagement"] >= 75:
-        insights.append(f"🎵 **Excellent Response**: {child_name} shows outstanding engagement ({best_style['avg_engagement']:.0f}%) with {best_style['style']} music. This is your go-to style!")
+        insights.append(
+            f"🎵 **Excellent Response**: {child_name} shows outstanding engagement "
+            f"({best_style['avg_engagement']:.0f}%) with {best_style['style']} music. "
+            f"This is your go-to style!"
+        )
     elif best_style["avg_engagement"] >= 60:
-        insights.append(f"✅ **Good Response**: {best_style['style'].capitalize()} music works well for {child_name} with {best_style['avg_engagement']:.0f}% average engagement.")
+        insights.append(
+            f"✅ **Good Response**: {best_style['style'].capitalize()} music works well "
+            f"for {child_name} with {best_style['avg_engagement']:.0f}% average engagement."
+        )
     else:
-        insights.append(f"📊 **Moderate Response**: {best_style['style'].capitalize()} music shows {best_style['avg_engagement']:.0f}% engagement - room for improvement.")
+        insights.append(
+            f"📊 **Moderate Response**: {best_style['style'].capitalize()} music shows "
+            f"{best_style['avg_engagement']:.0f}% engagement - room for improvement."
+        )
 
     # Usage patterns
     if best_style["total_plays"] >= 10:
-        insights.append(f"This style has been used {best_style['total_plays']} times across {best_style['total_sessions']} sessions, providing reliable data.")
+        insights.append(
+            f"This style has been used {best_style['total_plays']} times across "
+            f"{best_style['total_sessions']} sessions, providing reliable data."
+        )
 
     # Comparison
     if worst_style and best_style["avg_engagement"] - worst_style["avg_engagement"] > 20:
-        insights.append(f"⚠️ **Significant Difference**: {best_style['style'].capitalize()} music ({best_style['avg_engagement']:.0f}%) outperforms {worst_style['style']} ({worst_style['avg_engagement']:.0f}%) by {best_style['avg_engagement'] - worst_style['avg_engagement']:.0f} points. Focus on {best_style['style']} for better results.")
+        diff = best_style['avg_engagement'] - worst_style['avg_engagement']
+        insights.append(
+            f"⚠️ **Significant Difference**: {best_style['style'].capitalize()} music "
+            f"({best_style['avg_engagement']:.0f}%) outperforms {worst_style['style']} "
+            f"({worst_style['avg_engagement']:.0f}%) by {diff:.0f} points. "
+            f"Focus on {best_style['style']} for better results."
+        )
 
     # Recommendations
     if len(ranked) == 1:
-        insights.append(f"💡 **Recommendation**: Try experimenting with other music styles (happy, calm, energetic) to discover what works best for {child_name}.")
+        insights.append(
+            f"💡 **Recommendation**: Try experimenting with other music styles "
+            f"(happy, calm, energetic) to discover what works best for {child_name}."
+        )
     elif all(s["avg_engagement"] > 65 for s in ranked):
-        insights.append(f"🌟 **Great Progress**: {child_name} responds well to all music styles! Continue with variety to maintain engagement.")
+        insights.append(
+            f"🌟 **Great Progress**: {child_name} responds well to all music styles! "
+            f"Continue with variety to maintain engagement."
+        )
 
     # Data reliability
     if total_sessions < 5:
-        insights.append(f"📈 **Note**: Based on {total_sessions} session(s). More sessions will provide more accurate insights.")
+        insights.append(
+            f"📈 **Note**: Based on {total_sessions} session(s). "
+            f"More sessions will provide more accurate insights."
+        )
 
     return " ".join(insights)
 
@@ -434,5 +469,7 @@ async def get_child_engagement_trends(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Engagement trends error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get engagement trends")
+        logger.error("Engagement trends error: %s", e)
+        raise HTTPException(
+            status_code=500, detail="Failed to get engagement trends"
+        ) from e

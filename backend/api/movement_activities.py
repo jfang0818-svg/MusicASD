@@ -2,12 +2,13 @@
 Movement Activities API endpoints
 Guided movement sequences, dance prompts, and sensory regulation activities
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 import logging
 import uuid
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -87,7 +88,10 @@ MOVEMENT_ACTIVITIES = {
         "name": "Follow the Beat Dance",
         "description": "Dance movements following musical cues and prompts",
         "duration_minutes": 6,
-        "therapeutic_goals": ["motor_planning", "following_instructions", "rhythmic_entrainment", "social_interaction"],
+        "therapeutic_goals": [
+            "motor_planning", "following_instructions",
+            "rhythmic_entrainment", "social_interaction"
+        ],
         "energy_level": "medium_high",
         "movements": [
             {
@@ -456,7 +460,7 @@ async def start_movement_activity(
         "activity_name": activity_data["name"]
     })
 
-    logger.info(f"Started movement activity {movement_id} for session {session_id}")
+    logger.info("Started movement activity %s for session %s", movement_id, session_id)
 
     return {
         "status": "started",
@@ -538,7 +542,7 @@ async def complete_movement(
     is_complete = movement_session["current_movement"] >= len(activity_data["movements"])
     next_movement = None if is_complete else activity_data["movements"][movement_session["current_movement"]]
 
-    logger.info(f"Completed movement {movement_index} for activity {movement_id}")
+    logger.info("Completed movement %s for activity %s", movement_index, movement_id)
 
     return {
         "status": "movement_completed",
@@ -608,7 +612,11 @@ async def end_movement_activity(
         "total_movements": len(movement_session["completed_movements"]),
         "full_participation": full_participation,
         "partial_participation": partial_participation,
-        "completion_rate": len(movement_session["completed_movements"]) / len(MOVEMENT_ACTIVITIES[movement_session["activity_id"]]["movements"]) * 100
+        "completion_rate": (
+            len(movement_session["completed_movements"])
+            / len(MOVEMENT_ACTIVITIES[movement_session["activity_id"]]["movements"])
+            * 100
+        )
     }
 
     # Save back
@@ -625,7 +633,11 @@ async def end_movement_activity(
         "notes": therapeutic_notes
     })
 
-    logger.info(f"Ended movement activity {movement_id}: {len(movement_session['completed_movements'])} movements")
+    logger.info(
+        "Ended movement activity %s: %s movements",
+        movement_id,
+        len(movement_session['completed_movements'])
+    )
 
     return {
         "status": "completed",
@@ -661,7 +673,7 @@ async def get_movement_history(
 
     # List all sessions
     prefix = f"activities/movement/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     sessions = []
     for blob_name in blob_names[:limit]:
@@ -674,7 +686,13 @@ async def get_movement_history(
 
     # Calculate statistics
     completed = [s for s in sessions if s.get("status") == "completed"]
-    most_popular_activity = max(set(s.get("activity_id") for s in sessions), key=lambda x: sum(1 for s in sessions if s.get("activity_id") == x)) if sessions else None
+    most_popular_activity = None
+    if sessions:
+        activity_ids = set(s.get("activity_id") for s in sessions)
+        most_popular_activity = max(
+            activity_ids,
+            key=lambda x: sum(1 for s in sessions if s.get("activity_id") == x)
+        )
 
     return {
         "child_id": child_id,
@@ -684,6 +702,9 @@ async def get_movement_history(
             "total_sessions": len(sessions),
             "completed_sessions": len(completed),
             "most_popular_activity": most_popular_activity,
-            "most_popular_activity_name": MOVEMENT_ACTIVITIES[most_popular_activity]["name"] if most_popular_activity else None
+            "most_popular_activity_name": (
+                MOVEMENT_ACTIVITIES[most_popular_activity]["name"]
+                if most_popular_activity else None
+            )
         }
     }

@@ -2,12 +2,14 @@
 AI Music Recommendations API endpoints
 Smart song suggestions based on favorites, metrics, and context
 """
-from fastapi import APIRouter, HTTPException, Depends, Body, Query
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime, time
-from typing import Optional, List, Dict, Any
 import logging
+import uuid
 from collections import defaultdict, Counter
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -107,7 +109,8 @@ def calculate_song_score(
 @router.post("/suggest")
 async def get_music_recommendations(
     child_id: str = Body(..., embed=True),
-    context: Dict[str, Any] = Body(..., embed=True),  # goal, time_of_day, mood, activity_type
+    # goal, time_of_day, mood, activity_type
+    context: Dict[str, Any] = Body(..., embed=True),
     limit: int = Body(default=5, embed=True),
     exclude_songs: List[str] = Body(default=[], embed=True),
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -134,7 +137,7 @@ async def get_music_recommendations(
     # Get response history
     response_history = []
     prefix = f"music_responses/{child_id}/"
-    response_blobs = await azure_storage.list_blobs(prefix)
+    response_blobs = await azure_storage.list_blobs_in_path(prefix)
     for blob_name in response_blobs[:50]:  # Last 50 responses
         data = await azure_storage.load_json(blob_name)
         if data:
@@ -161,7 +164,10 @@ async def get_music_recommendations(
     recommendations = scored_songs[:limit]
 
     # Log recommendation request
-    logger.info(f"Generated {len(recommendations)} recommendations for child {child_id} with context: {context}")
+    logger.info(
+        "Generated %d recommendations for child %s with context: %s",
+        len(recommendations), child_id, context
+    )
 
     return {
         "child_id": child_id,
@@ -193,7 +199,7 @@ async def get_music_insights(
     # Get response history
     response_history = []
     prefix = f"music_responses/{child_id}/"
-    response_blobs = await azure_storage.list_blobs(prefix)
+    response_blobs = await azure_storage.list_blobs_in_path(prefix)
     for blob_name in response_blobs[:100]:  # Last 100 responses
         data = await azure_storage.load_json(blob_name)
         if data:
@@ -219,7 +225,11 @@ async def get_music_insights(
             "style": style,
             "avg_quality": round(avg_quality, 2),
             "total_sessions": len(qualities),
-            "consistency": "high" if max(qualities) - min(qualities) <= 1 else "moderate" if max(qualities) - min(qualities) <= 2 else "varied"
+            "consistency": (
+                "high" if max(qualities) - min(qualities) <= 1
+                else "moderate" if max(qualities) - min(qualities) <= 2
+                else "varied"
+            )
         })
     style_performance.sort(key=lambda x: x["avg_quality"], reverse=True)
 
@@ -337,7 +347,9 @@ async def record_recommendation_feedback(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save feedback")
 
-    logger.info(f"Recorded recommendation feedback for child {child_id}: {song_name}")
+    logger.info(
+        "Recorded recommendation feedback for child %s: %s", child_id, song_name
+    )
 
     return {
         "status": "recorded",
@@ -408,10 +420,18 @@ async def get_learning_progress(
         },
         "learning_status": {
             "is_improving": improvement > 0.5,
-            "confidence_level": "high" if total_recommendations >= 20 else "medium" if total_recommendations >= 10 else "low",
+            "confidence_level": (
+                "high" if total_recommendations >= 20
+                else "medium" if total_recommendations >= 10
+                else "low"
+            ),
             "data_points": total_recommendations
         },
-        "recommendation": "Continue providing feedback to improve recommendations" if total_recommendations < 20 else "Algorithm is well-tuned to child's preferences",
+        "recommendation": (
+            "Continue providing feedback to improve recommendations"
+            if total_recommendations < 20
+            else "Algorithm is well-tuned to child's preferences"
+        ),
         "timestamp": datetime.now().isoformat()
     }
 

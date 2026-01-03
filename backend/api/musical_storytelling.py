@@ -2,12 +2,13 @@
 Musical Storytelling API endpoints
 Interactive therapeutic stories with music and participation
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 import logging
 import uuid
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -464,7 +465,7 @@ async def start_storytelling_session(
         "story_title": story_data["title"]
     })
 
-    logger.info(f"Started storytelling {storytelling_id} for session {session_id}")
+    logger.info("Started storytelling %s for session %s", storytelling_id, session_id)
 
     return {
         "status": "started",
@@ -543,7 +544,7 @@ async def complete_scene(
     is_complete = storytelling_session["current_scene"] >= len(story_data["scenes"])
     next_scene = None if is_complete else story_data["scenes"][storytelling_session["current_scene"]]
 
-    logger.info(f"Completed scene {scene_id} for storytelling {storytelling_id}")
+    logger.info("Completed scene %s for storytelling %s", scene_id, storytelling_id)
 
     return {
         "status": "scene_completed",
@@ -611,7 +612,11 @@ async def end_storytelling_session(
         "total_scenes": len(storytelling_session["completed_scenes"]),
         "high_participation": high_participation,
         "moderate_participation": moderate_participation,
-        "completion_rate": len(storytelling_session["completed_scenes"]) / len(STORY_LIBRARY[storytelling_session["story_id"]]["scenes"]) * 100
+        "completion_rate": (
+            len(storytelling_session["completed_scenes"])
+            / len(STORY_LIBRARY[storytelling_session["story_id"]]["scenes"])
+            * 100
+        )
     }
 
     # Save back
@@ -628,7 +633,11 @@ async def end_storytelling_session(
         "notes": therapeutic_notes
     })
 
-    logger.info(f"Ended storytelling {storytelling_id}: {len(storytelling_session['completed_scenes'])} scenes")
+    logger.info(
+        "Ended storytelling %s: %s scenes",
+        storytelling_id,
+        len(storytelling_session['completed_scenes'])
+    )
 
     return {
         "status": "completed",
@@ -663,7 +672,7 @@ async def get_storytelling_history(
 
     # List all sessions
     prefix = f"activities/storytelling/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     sessions = []
     for blob_name in blob_names[:limit]:
@@ -676,7 +685,13 @@ async def get_storytelling_history(
 
     # Calculate statistics
     completed = [s for s in sessions if s.get("status") == "completed"]
-    most_popular_story = max(set(s.get("story_id") for s in sessions), key=lambda x: sum(1 for s in sessions if s.get("story_id") == x)) if sessions else None
+    most_popular_story = None
+    if sessions:
+        story_ids = set(s.get("story_id") for s in sessions)
+        most_popular_story = max(
+            story_ids,
+            key=lambda x: sum(1 for s in sessions if s.get("story_id") == x)
+        )
 
     return {
         "child_id": child_id,
@@ -686,7 +701,9 @@ async def get_storytelling_history(
             "total_sessions": len(sessions),
             "completed_sessions": len(completed),
             "most_popular_story": most_popular_story,
-            "most_popular_story_title": STORY_LIBRARY[most_popular_story]["title"] if most_popular_story else None
+            "most_popular_story_title": (
+                STORY_LIBRARY[most_popular_story]["title"] if most_popular_story else None
+            )
         }
     }
 
@@ -730,7 +747,7 @@ async def save_custom_story(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save custom story")
 
-    logger.info(f"Saved custom story for child {child_id}")
+    logger.info("Saved custom story for child %s", child_id)
 
     return {
         "status": "saved",

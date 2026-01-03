@@ -1,8 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ChevronRight, Play, Pause, SkipForward, Target, Lightbulb } from 'lucide-react';
-import { CoreActivity } from '@/app/hooks/useSessionStructure';
+import { ChevronLeft, ChevronRight, Play, Pause, SkipForward, Target, Lightbulb, Check } from 'lucide-react';
+import { CoreActivity, PhaseDefinition, SessionPhase } from '@/app/hooks/useSessionStructure';
 
 interface ActivityProgressProps {
   currentActivity: CoreActivity;
@@ -19,6 +19,10 @@ interface ActivityProgressProps {
   onSkipToActivity: (activityId: string) => void;
   musicStyle?: string;
   onPlayMusic?: (style: string) => void;
+  // Phase navigation props
+  allPhases?: PhaseDefinition[];
+  currentPhaseIndex?: number;
+  onSkipToPhase?: (phaseId: SessionPhase) => void;
 }
 
 export default function ActivityProgress({
@@ -36,6 +40,9 @@ export default function ActivityProgress({
   onSkipToActivity,
   musicStyle,
   onPlayMusic,
+  allPhases,
+  currentPhaseIndex,
+  onSkipToPhase,
 }: ActivityProgressProps) {
   // Format time as mm:ss
   const formatTime = (seconds: number) => {
@@ -96,6 +103,39 @@ export default function ActivityProgress({
     >
       {/* Header with gradient */}
       <div className={`bg-gradient-to-r ${getColorClass(currentActivity.color, 'gradient')} p-4 text-white`}>
+        {/* Phase Navigation Row */}
+        {allPhases && onSkipToPhase && currentPhaseIndex !== undefined && (
+          <div className="flex items-center justify-end gap-1 mb-2 -mt-1">
+            <button
+              onClick={() => currentPhaseIndex > 0 && onSkipToPhase(allPhases[currentPhaseIndex - 1].id)}
+              disabled={currentPhaseIndex === 0}
+              className={`p-0.5 rounded transition-all ${
+                currentPhaseIndex === 0
+                  ? 'text-white/30 cursor-not-allowed'
+                  : 'text-white/70 hover:text-white hover:bg-white/20'
+              }`}
+              aria-label="Previous phase"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="text-xs text-white/80 min-w-[70px] text-center">
+              Phase {currentPhaseIndex + 1} of {allPhases.length}
+            </span>
+            <button
+              onClick={() => currentPhaseIndex < allPhases.length - 1 && onSkipToPhase(allPhases[currentPhaseIndex + 1].id)}
+              disabled={currentPhaseIndex === allPhases.length - 1}
+              className={`p-0.5 rounded transition-all ${
+                currentPhaseIndex === allPhases.length - 1
+                  ? 'text-white/30 cursor-not-allowed'
+                  : 'text-white/70 hover:text-white hover:bg-white/20'
+              }`}
+              aria-label="Next phase"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-3xl">{currentActivity.icon}</span>
@@ -249,6 +289,69 @@ export default function ActivityProgress({
           {currentIndex < totalActivities - 1 ? 'Next Activity' : 'Finish Activities'}
         </button>
       </div>
+
+      {/* Phase Navigation - Switch between Hello/Activity/Goodbye */}
+      {allPhases && onSkipToPhase && currentPhaseIndex !== undefined && (
+        <div className="px-4 pb-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="text-xs font-semibold text-gray-500 mb-2">Switch Phase:</div>
+          <div className="flex justify-between items-center gap-2">
+            {allPhases.map((phase, index) => {
+              const isActive = index === currentPhaseIndex;
+              const isComplete = index < currentPhaseIndex;
+
+              const phaseColors: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+                green: {
+                  bg: 'bg-green-100 dark:bg-green-900/20',
+                  border: 'border-green-500',
+                  text: 'text-green-700 dark:text-green-300',
+                  badge: 'bg-green-500',
+                },
+                blue: {
+                  bg: 'bg-blue-100 dark:bg-blue-900/20',
+                  border: 'border-blue-500',
+                  text: 'text-blue-700 dark:text-blue-300',
+                  badge: 'bg-blue-500',
+                },
+                orange: {
+                  bg: 'bg-orange-100 dark:bg-orange-900/20',
+                  border: 'border-orange-500',
+                  text: 'text-orange-700 dark:text-orange-300',
+                  badge: 'bg-orange-500',
+                },
+              };
+              const colors = phaseColors[phase.color] || phaseColors.blue;
+
+              return (
+                <button
+                  key={phase.id}
+                  onClick={() => onSkipToPhase(phase.id)}
+                  className={`flex-1 flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all ${
+                    isActive
+                      ? `${colors.bg} border-2 ${colors.border} shadow-md`
+                      : isComplete
+                      ? 'bg-gray-200 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 opacity-60'
+                      : 'bg-gray-100 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
+                      isActive ? colors.badge + ' text-white' : isComplete ? 'bg-gray-400 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {isComplete ? <Check className="h-5 w-5" /> : phase.icon}
+                  </div>
+                  <span className={`text-xs font-bold ${isActive ? colors.text : 'text-gray-600 dark:text-gray-400'}`}>
+                    {phase.name}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {phase.durationMinutes}min
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

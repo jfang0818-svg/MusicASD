@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState, type ReactNode } from 'react';
 import { AuthProvider } from '../../contexts/AuthContext';
+import { MusicGenerationProvider } from '../../contexts/MusicGenerationContext';
 import { Toaster } from 'react-hot-toast';
+import MusicGenerationStatus from '../MusicGenerationStatus';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -27,8 +29,10 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
-        <Toaster
+        <MusicGenerationProvider>
+          {children}
+          <MusicGenerationStatus />
+          <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
@@ -53,7 +57,8 @@ export function Providers({ children }: ProvidersProps) {
             },
           }}
         />
-        <ReactQueryDevtools initialIsOpen={false} />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </MusicGenerationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

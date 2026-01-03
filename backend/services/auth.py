@@ -2,16 +2,18 @@
 Authentication Service
 Handles JWT token generation, password hashing, and authentication
 """
-import jwt
+import logging
 import secrets
 import string
 import uuid
-import bcrypt
-import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
+import bcrypt
+import jwt
 from fastapi import HTTPException, Security, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -65,13 +67,15 @@ class AuthService:
                 algorithms=[settings.JWT_ALGORITHM]
             )
             return payload
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=401, detail="Token has expired")
-        except jwt.InvalidTokenError:
-            raise HTTPException(status_code=401, detail="Invalid token")
+        except jwt.ExpiredSignatureError as e:
+            raise HTTPException(status_code=401, detail="Token has expired") from e
+        except jwt.InvalidTokenError as e:
+            raise HTTPException(status_code=401, detail="Invalid token") from e
 
     @staticmethod
-    def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
+    def get_current_user_id(
+        credentials: HTTPAuthorizationCredentials = Security(security)
+    ) -> str:
         """Extract user ID from JWT token"""
         token = credentials.credentials
         payload = AuthService.decode_token(token)
@@ -83,7 +87,9 @@ class AuthService:
         return user_id
 
     @staticmethod
-    def get_current_user_email(credentials: HTTPAuthorizationCredentials = Security(security)) -> str:
+    def get_current_user_email(
+        credentials: HTTPAuthorizationCredentials = Security(security)
+    ) -> str:
         """Extract user email from JWT token"""
         token = credentials.credentials
         payload = AuthService.decode_token(token)
@@ -100,7 +106,9 @@ class AuthService:
         return ''.join(secrets.choice(string.digits) for _ in range(6))
 
     @staticmethod
-    async def send_verification_code(email: str, azure_storage, email_service) -> str:
+    async def send_verification_code(
+        email: str, azure_storage, email_service
+    ) -> str:
         """Send verification code to email"""
         try:
             # Normalize email to lowercase
@@ -121,16 +129,17 @@ class AuthService:
             await azure_storage.save_verification_code(email, code, expires_at)
 
             # Log the code for debugging
-            logger.info(f"Generated verification code for {email}: {code}")
+            logger.info("Generated verification code for %s: %s", email, code)
+            print(f"\n{'='*50}\nVERIFICATION CODE for {email}: {code}\n{'='*50}\n")
 
             # Send email
             result = await email_service.send_verification_code(email, code, expires_in_minutes=5)
 
             if result.get("success"):
-                logger.info(f"Verification code sent successfully to {email}")
+                logger.info("Verification code sent successfully to %s", email)
             else:
-                logger.error(f"Failed to send email: {result.get('error')}")
-                logger.warning(f"EMAIL NOT SENT - Code for {email}: {code}")
+                logger.error("Failed to send email: %s", result.get('error'))
+                logger.warning("EMAIL NOT SENT - Code for %s: %s", email, code)
 
             return "Verification code sent"
 
@@ -138,12 +147,12 @@ class AuthService:
             raise
         except Exception as e:
             import traceback
-            logger.error(f"Error in send_verification_code: {str(e)}")
-            logger.error(f"Traceback: {traceback.format_exc()}")
+            logger.error("Error in send_verification_code: %s", str(e))
+            logger.error("Traceback: %s", traceback.format_exc())
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to send verification code"
-            )
+            ) from e
 
     @staticmethod
     async def verify_code(email: str, code: str, azure_storage) -> bool:
@@ -234,7 +243,7 @@ class AuthService:
         # Delete verification code if exists
         await azure_storage.delete_verification_code(email)
 
-        logger.info(f"User registered: {email}, is_caregiver: {is_caregiver}")
+        logger.info("User registered: %s, is_caregiver: %s", email, is_caregiver)
         return user_data
 
     @staticmethod
@@ -347,7 +356,7 @@ class AuthService:
         # Mark token as used
         await azure_storage.mark_reset_used(token)
 
-        logger.info(f"Password reset for: {reset['email']}")
+        logger.info("Password reset for: %s", reset['email'])
 
 
 # Singleton instance

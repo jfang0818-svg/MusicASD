@@ -5,9 +5,10 @@ Handles sending emails via SMTP with beautiful HTML templates
 import logging
 import smtplib
 import ssl
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import Optional, Dict, Any
+from email.mime.text import MIMEText
+from typing import Any, Dict, Optional
+
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class EmailService:
         if not self.is_configured:
             logger.warning("⚠️ Email service not configured - emails will be logged only (dev mode)")
         else:
-            logger.info(f"✅ Email service configured with {self.smtp_host}:{self.smtp_port}")
+            logger.info("Email service configured with %s:%s", self.smtp_host, self.smtp_port)
 
     async def send_email(
         self,
@@ -50,13 +51,13 @@ class EmailService:
         Returns:
             Dict with keys: success (bool), error (str)
         """
-        logger.info(f"📧 Sending email to {to_email}: {subject}")
+        logger.info("Sending email to %s: %s", to_email, subject)
 
         # If not configured, log and return (dev mode)
         if not self.is_configured:
-            logger.warning(f"📝 DEV MODE - Email would be sent to {to_email}:")
-            logger.warning(f"   Subject: {subject}")
-            logger.warning(f"   Content: {content[:200]}...")
+            logger.warning("DEV MODE - Email would be sent to %s:", to_email)
+            logger.warning("   Subject: %s", subject)
+            logger.warning("   Content: %s...", content[:200])
             return {
                 "success": True,  # Return True in dev mode for testing
                 "error": None,
@@ -89,12 +90,12 @@ class EmailService:
                 server.login(self.smtp_user, self.smtp_password)
                 server.send_message(msg)
 
-            logger.info(f"✅ Email sent successfully to {to_email}")
+            logger.info("Email sent successfully to %s", to_email)
             return {"success": True, "error": None}
 
         except Exception as e:
-            error_msg = f"Failed to send email: {str(e)}"
-            logger.error(f"❌ {error_msg}")
+            error_msg = f"Failed to send email: {e}"
+            logger.error("Email send failed: %s", error_msg)
             return {"success": False, "error": error_msg}
 
     async def send_verification_code(

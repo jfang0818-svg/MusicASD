@@ -130,7 +130,7 @@ async def update_child_progress(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update progress: {str(e)}"
-        )
+        ) from e
 
 
 async def check_and_unlock_achievements(child_id: str, progress: ChildProgress):
@@ -177,7 +177,7 @@ async def get_unlocked_achievement_ids(child_id: str) -> set:
                     unlocked_ids.add(unlock_data["achievement_id"])
 
         return unlocked_ids
-    except:
+    except Exception:
         return set()
 
 
@@ -253,14 +253,14 @@ async def unlock_achievement(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
-        )
+        ) from e
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to unlock achievement: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/child/{child_id}/unlocked", response_model=List[UnlockedAchievement])
@@ -287,7 +287,7 @@ async def get_unlocked_achievements(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve unlocked achievements: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/child/{child_id}/new-achievements", response_model=List[UnlockedAchievement])
@@ -312,7 +312,7 @@ async def get_new_achievements(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve new achievements: {str(e)}"
-        )
+        ) from e
 
 
 @router.put("/achievement/{unlock_id}/mark-seen")
@@ -353,4 +353,4 @@ async def mark_achievement_seen(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to mark achievement as seen: {str(e)}"
-        )
+        ) from e

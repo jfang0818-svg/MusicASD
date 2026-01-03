@@ -351,27 +351,60 @@ function MusicLibraryTab({
     }
   };
 
+  // Synthetic demo data for when music library is empty
+  const syntheticMusicData = [
+    { name: 'Gentle Ocean Waves.mp3', categories: ['calming_regulation', 'sensory_soothing'] },
+    { name: 'Morning Sunlight.mp3', categories: ['calming_regulation', 'transition'] },
+    { name: 'Focus Flow Beat.mp3', categories: ['focus_attention'] },
+    { name: 'Concentration Piano.mp3', categories: ['focus_attention', 'calming_regulation'] },
+    { name: 'Happy Clap Along.mp3', categories: ['social_interactive', 'movement_motor'] },
+    { name: 'Turn Taking Song.mp3', categories: ['social_interactive'] },
+    { name: 'Dance Party Fun.mp3', categories: ['movement_motor', 'sensory_seeking'] },
+    { name: 'Marching Band.mp3', categories: ['movement_motor'] },
+    { name: 'Energizing Drums.mp3', categories: ['sensory_seeking', 'movement_motor'] },
+    { name: 'Upbeat Adventure.mp3', categories: ['sensory_seeking'] },
+    { name: 'Soft Rain Sounds.mp3', categories: ['sensory_soothing', 'sleep_rest'] },
+    { name: 'Peaceful Garden.mp3', categories: ['sensory_soothing'] },
+    { name: 'Lullaby Dreams.mp3', categories: ['sleep_rest'] },
+    { name: 'Nighttime Stars.mp3', categories: ['sleep_rest', 'sensory_soothing'] },
+    { name: 'Getting Ready Song.mp3', categories: ['transition'] },
+    { name: 'Time to Change.mp3', categories: ['transition', 'calming_regulation'] },
+  ];
+
   // Collect all unique music files with their categories
   const allMusicFiles = new Map<string, { file: any; styles: string[] }>();
 
-  Object.entries(musicLibrary).forEach(([style, files]: [string, any]) => {
-    if (Array.isArray(files)) {
-      files.forEach((file: any) => {
-        const fileName = typeof file === 'string' ? file : file.name;
-        const fileCategories = typeof file === 'object' && file.categories ? file.categories : [style];
+  // Check if musicLibrary has actual content
+  const hasRealMusic = Object.values(musicLibrary).some((files: any) => Array.isArray(files) && files.length > 0);
 
-        if (allMusicFiles.has(fileName)) {
-          const existing = allMusicFiles.get(fileName)!;
-          existing.styles = Array.from(new Set([...existing.styles, ...fileCategories]));
-        } else {
-          allMusicFiles.set(fileName, {
-            file,
-            styles: fileCategories
-          });
-        }
+  if (hasRealMusic) {
+    Object.entries(musicLibrary).forEach(([style, files]: [string, any]) => {
+      if (Array.isArray(files)) {
+        files.forEach((file: any) => {
+          const fileName = typeof file === 'string' ? file : file.name;
+          const fileCategories = typeof file === 'object' && file.categories ? file.categories : [style];
+
+          if (allMusicFiles.has(fileName)) {
+            const existing = allMusicFiles.get(fileName)!;
+            existing.styles = Array.from(new Set([...existing.styles, ...fileCategories]));
+          } else {
+            allMusicFiles.set(fileName, {
+              file,
+              styles: fileCategories
+            });
+          }
+        });
+      }
+    });
+  } else {
+    // Use synthetic demo data
+    syntheticMusicData.forEach((item) => {
+      allMusicFiles.set(item.name, {
+        file: item.name,
+        styles: item.categories
       });
-    }
-  });
+    });
+  }
 
   // Filter music based on selected categories
   const filteredMusic = Array.from(allMusicFiles.entries())
@@ -939,19 +972,39 @@ function UsageHistoryTab({ selectedChild }: any) {
     enabled: !!selectedChild
   });
 
-  if (!selectedChild) {
-    return (
-      <motion.div
-        key="history-empty"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center py-12"
-      >
-        <TrendingUp className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-        <p className="text-gray-500">Please select a child to view usage history</p>
-      </motion.div>
-    );
-  }
+  // Synthetic demo data for demonstration
+  const syntheticAnalytics = {
+    totals: {
+      music_plays: 47,
+      total_music_minutes: 156,
+      activity_uses: 23,
+      total_activity_minutes: 89,
+      resource_accesses: 31
+    },
+    music_analytics: {
+      completion_rate: 78
+    }
+  };
+
+  const syntheticHistory = {
+    logs: [
+      { log_type: 'music_play', music_title: 'Gentle Ocean Waves', timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), completed: true },
+      { log_type: 'activity_usage', activity_name: 'Sound Matching Game', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), completed: true },
+      { log_type: 'music_play', music_title: 'Focus Flow Beat', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(), completed: true },
+      { log_type: 'resource_access', resource_name: 'Morning Routine Story', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), completed: false },
+      { log_type: 'music_play', music_title: 'Dance Party Fun', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), completed: true },
+      { log_type: 'activity_usage', activity_name: 'Movement Activities', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(), completed: true },
+      { log_type: 'music_play', music_title: 'Lullaby Dreams', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), completed: true },
+      { log_type: 'resource_access', resource_name: 'Animal Sounds Pack', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(), completed: true },
+      { log_type: 'activity_usage', activity_name: 'Musical Stories', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 49).toISOString(), completed: false },
+      { log_type: 'music_play', music_title: 'Turn Taking Song', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(), completed: true },
+    ]
+  };
+
+  // Use synthetic data if no real data available
+  const displayAnalytics = analyticsData || syntheticAnalytics;
+  const displayHistory = historyData || syntheticHistory;
+  const isUsingDemoData = !selectedChild || !analyticsData;
 
   return (
     <motion.div
@@ -961,79 +1014,78 @@ function UsageHistoryTab({ selectedChild }: any) {
       exit={{ opacity: 0, y: -20 }}
       className="space-y-6"
     >
-      {/* Analytics Summary */}
-      {analyticsData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
-            <Music className="w-8 h-8 text-blue-500 mb-2" />
-            <p className="text-2xl font-bold text-gray-800">{analyticsData.totals.music_plays}</p>
-            <p className="text-sm text-gray-500">Music Plays</p>
-            <p className="text-xs text-gray-400 mt-1">{analyticsData.totals.total_music_minutes} min</p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
-            <Gamepad2 className="w-8 h-8 text-orange-500 mb-2" />
-            <p className="text-2xl font-bold text-gray-800">{analyticsData.totals.activity_uses}</p>
-            <p className="text-sm text-gray-500">Activities</p>
-            <p className="text-xs text-gray-400 mt-1">{analyticsData.totals.total_activity_minutes} min</p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
-            <BookOpen className="w-8 h-8 text-purple-500 mb-2" />
-            <p className="text-2xl font-bold text-gray-800">{analyticsData.totals.resource_accesses}</p>
-            <p className="text-sm text-gray-500">Resources</p>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
-            <Heart className="w-8 h-8 text-pink-500 mb-2" />
-            <p className="text-2xl font-bold text-gray-800">{analyticsData.music_analytics.completion_rate}%</p>
-            <p className="text-sm text-gray-500">Completion Rate</p>
-          </div>
+      {/* Demo Data Banner */}
+      {isUsingDemoData && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-amber-500" />
+          <p className="text-sm text-amber-700">
+            <strong>Demo Mode:</strong> Showing sample data for demonstration purposes
+          </p>
         </div>
       )}
+
+      {/* Analytics Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+          <Music className="w-8 h-8 text-blue-500 mb-2" />
+          <p className="text-2xl font-bold text-gray-800">{displayAnalytics.totals.music_plays}</p>
+          <p className="text-sm text-gray-500">Music Plays</p>
+          <p className="text-xs text-gray-400 mt-1">{displayAnalytics.totals.total_music_minutes} min</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+          <Gamepad2 className="w-8 h-8 text-orange-500 mb-2" />
+          <p className="text-2xl font-bold text-gray-800">{displayAnalytics.totals.activity_uses}</p>
+          <p className="text-sm text-gray-500">Activities</p>
+          <p className="text-xs text-gray-400 mt-1">{displayAnalytics.totals.total_activity_minutes} min</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+          <BookOpen className="w-8 h-8 text-purple-500 mb-2" />
+          <p className="text-2xl font-bold text-gray-800">{displayAnalytics.totals.resource_accesses}</p>
+          <p className="text-sm text-gray-500">Resources</p>
+        </div>
+
+        <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+          <Heart className="w-8 h-8 text-pink-500 mb-2" />
+          <p className="text-2xl font-bold text-gray-800">{displayAnalytics.music_analytics.completion_rate}%</p>
+          <p className="text-sm text-gray-500">Completion Rate</p>
+        </div>
+      </div>
 
       {/* Recent Activity */}
-      {historyData && historyData.logs && (
-        <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-green-500" />
-            Recent Activity
-          </h2>
-          <div className="space-y-3">
-            {historyData.logs.slice(0, 10).map((log: any, index: number) => (
-              <div
-                key={index}
-                className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="text-2xl">
-                  {log.log_type === 'music_play' ? '🎵' :
-                   log.log_type === 'activity_usage' ? '🎮' : '📚'}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-800">
-                    {log.music_title || log.activity_name || log.resource_name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(log.timestamp).toLocaleString()}
-                  </p>
-                </div>
-                {log.completed && (
-                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
-                    Completed
-                  </span>
-                )}
+      <div className="bg-white rounded-xl p-6 shadow-md border border-gray-200">
+        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <Calendar className="w-6 h-6 text-green-500" />
+          Recent Activity
+        </h2>
+        <div className="space-y-3">
+          {displayHistory.logs.slice(0, 10).map((log: any, index: number) => (
+            <div
+              key={index}
+              className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <div className="text-2xl">
+                {log.log_type === 'music_play' ? '🎵' :
+                 log.log_type === 'activity_usage' ? '🎮' : '📚'}
               </div>
-            ))}
-          </div>
+              <div className="flex-1">
+                <p className="font-semibold text-gray-800">
+                  {log.music_title || log.activity_name || log.resource_name}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {new Date(log.timestamp).toLocaleString()}
+                </p>
+              </div>
+              {log.completed && (
+                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded">
+                  Completed
+                </span>
+              )}
+            </div>
+          ))}
         </div>
-      )}
-
-      {!historyData && (
-        <div className="text-center py-12 text-gray-500">
-          <TrendingUp className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p>Loading usage history...</p>
-        </div>
-      )}
+      </div>
     </motion.div>
   );
 }
@@ -1578,24 +1630,21 @@ function AIGenerateMusicModal({ show, onClose, loadMusicLibrary }: any) {
 
     setGenerating(true);
     try {
-      const requestBody = generationMode === 'generic'
-        ? {
-            mode: 'generic',
-            categories: selectedCategories,
-            duration,
-            tempo,
-            filename: `generic_${selectedCategories[0]}_${Date.now()}`
-          }
-        : {
-            mode: 'asd_specific',
-            child_id: selectedChild,
-            categories: selectedCategories,
-            sensory_profile: sensoryProfile,
-            duration,
-            tempo,
-            predictability: predictability / 100, // Convert to 0-1
-            filename: `asd_${selectedChild}_${Date.now()}`
-          };
+      // Map category to style for backend
+      const style = selectedCategories[0]?.replace(/_/g, '_') || 'calming_regulation';
+
+      const requestBody = {
+        style,
+        duration,
+        tempo,
+        use_musicgen: true,  // Use MusicGen AI
+        mood: sensoryProfile === 'sensory_seeking' ? 'energetic' : 'peaceful',
+        complexity: 'simple',
+        filename: generationMode === 'generic'
+          ? `generic_${style}_${Date.now()}`
+          : `asd_${selectedChild}_${Date.now()}`,
+        child_id: generationMode === 'asd_specific' ? selectedChild : undefined,
+      };
 
       const response = await fetch('/api/backend/music/generate', {
         method: 'POST',
@@ -1608,11 +1657,13 @@ function AIGenerateMusicModal({ show, onClose, loadMusicLibrary }: any) {
         loadMusicLibrary();
         onClose();
       } else {
-        throw new Error('Generation failed');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.detail || errorData.error || `Generation failed (${response.status})`;
+        throw new Error(errorMsg);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Generation failed:', error);
-      toast.error('Failed to generate music');
+      toast.error(error.message || 'Failed to generate music');
     } finally {
       setGenerating(false);
     }

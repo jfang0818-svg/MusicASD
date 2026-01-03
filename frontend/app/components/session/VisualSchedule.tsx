@@ -112,9 +112,6 @@ export default function VisualSchedule({
         <h3 className="text-lg font-bold text-gray-900 dark:text-white">
           📅 Session Structure
         </h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          Phase {currentPhaseIndex + 1} of {allPhases.length}
-        </span>
       </div>
 
       {/* Current Phase Card */}

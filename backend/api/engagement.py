@@ -1,10 +1,11 @@
 """
 Engagement API endpoints
 """
+import logging
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from datetime import datetime
-import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["engagement"])
@@ -33,11 +34,14 @@ def update_engagement(update: EngagementUpdate):
     state = get_state()
 
     if update.level not in ["LOW", "MED", "HIGH"]:
-        raise HTTPException(status_code=400, detail="Invalid engagement level. Must be LOW, MED, or HIGH")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid engagement level. Must be LOW, MED, or HIGH"
+        )
 
     old_level = state.engagement_level
     state.engagement_level = update.level
-    logger.info(f"Engagement updated: {old_level} -> {update.level}")
+    logger.info("Engagement updated: %s -> %s", old_level, update.level)
 
     # Log engagement change if session is active
     if state.session_active:
@@ -90,7 +94,10 @@ def simulate_engagement_pattern(pattern: str = "random"):
     }
 
     if pattern not in patterns:
-        raise HTTPException(status_code=400, detail=f"Invalid pattern. Choose from: {list(patterns.keys())}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid pattern. Choose from: {list(patterns.keys())}"
+        )
 
     return {
         "pattern": pattern,

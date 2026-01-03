@@ -117,7 +117,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  SonicSoothe
+                  MusicASD
                 </h1>
                 <p className="text-xs text-gray-500">Music that heals</p>
               </div>
@@ -499,8 +499,8 @@ export default function DashboardPage() {
             <h3 className="text-2xl font-bold text-gray-800 mb-3">No profiles yet</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
               {isSelf
-                ? 'Set up your profile to start using SonicSoothe for music therapy'
-                : 'Create a profile to start using SonicSoothe for therapy sessions'}
+                ? 'Set up your profile to start using MusicASD for music therapy'
+                : 'Create a profile to start using MusicASD for therapy sessions'}
             </p>
             <Link
               href="/dashboard/profiles/new"

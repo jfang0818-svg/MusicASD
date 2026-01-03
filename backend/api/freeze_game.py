@@ -2,12 +2,13 @@
 Freeze Game API endpoints
 Handles the Musical Freeze Dance game activity
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import List, Optional
 import logging
 import uuid
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Depends, Body
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -67,7 +68,7 @@ async def start_freeze_game(
         "music_style": music_style
     })
 
-    logger.info(f"Started freeze game {game_id} for session {session_id}")
+    logger.info("Started freeze game %s for session %s", game_id, session_id)
 
     return {
         "status": "started",
@@ -125,7 +126,7 @@ async def record_freeze_round(
         "notes": notes
     })
 
-    logger.info(f"Recorded freeze game round for game {game_id}: {child_froze}")
+    logger.info("Recorded freeze game round for game %s: %s", game_id, child_froze)
 
     return {
         "status": "recorded",
@@ -198,7 +199,7 @@ async def end_freeze_game(
         "notes": notes
     })
 
-    logger.info(f"Ended freeze game {game_id}: {successful_freezes}/{total_rounds} success")
+    logger.info("Ended freeze game %s: %s/%s success", game_id, successful_freezes, total_rounds)
 
     return {
         "status": "completed",
@@ -227,7 +228,7 @@ async def get_freeze_game_history(
 
     # List all freeze game activities
     prefix = f"activities/freeze_game/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     games = []
     for blob_name in blob_names[:limit]:

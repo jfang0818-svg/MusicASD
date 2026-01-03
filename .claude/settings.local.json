@@ -2,9 +2,26 @@
   "permissions": {
     "allow": [
       "Bash(\"C:\\development\\on_going_proj\\musicASD\\.venv\\Scripts\\python.exe\" -c:*)",
-      "Bash(del /F \"c:\\development\\on_going_proj\\musicASD\\test_music_gen.py\")",
-      "Bash(cmd /c del \"c:\\development\\on_going_proj\\musicASD\\test_music_gen.py\")",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(wmic process:*)",
+      "Bash(.venv/Scripts/python.exe -m pylint:*)",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(\"C:/development/on_going_proj/musicASD/.venv/Scripts/pip3.exe\" install pylint)",
+      "Bash(\"C:/development/on_going_proj/musicASD/.venv/Scripts/pylint.exe\" backend:*)",
+      "Bash(\"C:/development/on_going_proj/musicASD/.venv/Scripts/python.exe\":*)",
+      "Bash(pandoc:*)",
+      "Bash(\"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\.venv\\\\Scripts\\\\pip.exe\" install python-docx)",
+      "Bash(\"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\.venv\\\\Scripts\\\\python.exe\" -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload)",
+      "Bash(\".venv\\\\Scripts\\\\python.exe\" -c \"from database import engine, Base; Base.metadata.create_all\\(bind=engine\\); print\\(''Database tables created!''\\)\")",
+      "Bash(cat:*)",
+      "Bash(\"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\.venv\\\\Scripts\\\\python.exe\" -c:*)",
+      "Bash(mkdir:*)",
+      "Bash(dir \"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\frontend\\\\app\\\\api\\\\backend\" /s /b)",
+      "Bash(\"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\.venv\\\\Scripts\\\\python.exe\":*)",
+      "Bash(findstr:*)",
+      "Bash(\"C:\\\\development\\\\on_going_proj\\\\musicASD\\\\.venv\\\\Scripts\\\\python.exe\" -c \"\nfrom services.musicgen_service import MusicGenService\nimport asyncio\n\nasync def test\\(\\):\n    service = MusicGenService\\(\\)\n    print\\(''Initializing MusicGen...''\\)\n    result = await service.initialize\\(\\)\n    print\\(f''Initialized: {result}''\\)\n    print\\(f''Status: {service.get_status\\(\\)}''\\)\n\nasyncio.run\\(test\\(\\)\\)\n\")"
     ],
     "deny": [],
     "ask": []

@@ -2,11 +2,12 @@
 Favorites API endpoints
 Handles favorite songs management for child profiles
 """
+from datetime import datetime
+import logging
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException, Depends, Body
 from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-import logging
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -72,7 +73,7 @@ async def add_to_favorites(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update favorites")
 
-    logger.info(f"Added favorite '{music_file}' for child {child_id}")
+    logger.info("Added favorite '%s' for child %s", music_file, child_id)
 
     return {
         "status": "success",
@@ -157,7 +158,7 @@ async def remove_from_favorites(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update favorites")
 
-    logger.info(f"Removed favorite {favorite_id} for child {child_id}")
+    logger.info("Removed favorite %s for child %s", favorite_id, child_id)
 
     return {
         "status": "success",
@@ -216,7 +217,7 @@ async def track_favorite_play(
     scores = favorite.get("quality_scores", [])
     avg_quality = sum(scores) / len(scores) if scores else 0
 
-    logger.info(f"Tracked play for favorite {favorite_id}, child {child_id}")
+    logger.info("Tracked play for favorite %s, child %s", favorite_id, child_id)
 
     return {
         "status": "success",
@@ -263,7 +264,7 @@ async def update_favorite_tags(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update tags")
 
-    logger.info(f"Updated tags for favorite {favorite_id}, child {child_id}")
+    logger.info("Updated tags for favorite %s, child %s", favorite_id, child_id)
 
     return {
         "status": "success",

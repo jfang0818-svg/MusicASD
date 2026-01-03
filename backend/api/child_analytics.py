@@ -5,10 +5,11 @@ Provides comprehensive analytics and progress tracking for individual children.
 Aggregates data from goals, sessions, notes, and engagement metrics.
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
 from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Depends, status
 
 from api.auth import get_current_user
 from services.azure_storage import azure_storage
@@ -39,11 +40,19 @@ async def get_child_progress_summary(
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
+        # Check if azure storage is initialized
+        if not azure_storage.container_client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service not available"
+            )
+
         # === FETCH GOALS DATA ===
         goals = []
         goals_prefix = f"goals/child_{child_id}/"
 
-        async for blob in azure_storage.container_client.list_blobs(name_starts_with=goals_prefix):
+        blobs = azure_storage.container_client.list_blobs(name_starts_with=goals_prefix)
+        async for blob in blobs:
             if blob.name.endswith(".json") and "_progress_" not in blob.name:
                 goal_data = await azure_storage._load_json(blob.name)
                 if goal_data:
@@ -58,23 +67,33 @@ async def get_child_progress_summary(
         progress_percentages = []
         for goal in goals:
             if goal.target - goal.baseline != 0:
-                progress = ((goal.current_value - goal.baseline) / (goal.target - goal.baseline)) * 100
+                diff = goal.target - goal.baseline
+                progress = ((goal.current_value - goal.baseline) / diff) * 100
                 progress_percentages.append(min(progress, 100))
 
-        avg_goal_progress = sum(progress_percentages) / len(progress_percentages) if progress_percentages else 0
+        if progress_percentages:
+            avg_goal_progress = sum(progress_percentages) / len(progress_percentages)
+        else:
+            avg_goal_progress = 0
 
         # === FETCH SESSION NOTES ===
         notes = []
         notes_prefix = "session_notes/"
 
-        async for blob in azure_storage.container_client.list_blobs(name_starts_with=notes_prefix):
+        blobs = azure_storage.container_client.list_blobs(name_starts_with=notes_prefix)
+        async for blob in blobs:
             if blob.name.endswith(".json"):
                 note_data = await azure_storage._load_json(blob.name)
                 if note_data and note_data.get("child_id") == child_id:
-                    note = SessionNote(**note_data)
-                    note_timestamp = datetime.fromisoformat(note.timestamp)
-                    if note_timestamp >= start_date:
-                        notes.append(note)
+                    try:
+                        note = SessionNote(**note_data)
+                        if note.timestamp:
+                            note_timestamp = datetime.fromisoformat(note.timestamp)
+                            if note_timestamp >= start_date:
+                                notes.append(note)
+                    except (ValueError, TypeError):
+                        # Skip notes with invalid data
+                        pass
 
         # Categorize notes
         breakthrough_count = len([n for n in notes if n.note_type == NoteType.BREAKTHROUGH])
@@ -85,13 +104,18 @@ async def get_child_progress_summary(
         sessions = []
         sessions_prefix = f"sessions/child_{child_id}/"
 
-        async for blob in azure_storage.container_client.list_blobs(name_starts_with=sessions_prefix):
+        blobs = azure_storage.container_client.list_blobs(name_starts_with=sessions_prefix)
+        async for blob in blobs:
             if blob.name.endswith(".json"):
                 session_data = await azure_storage._load_json(blob.name)
-                if session_data:
-                    session_timestamp = datetime.fromisoformat(session_data.get("start_time", ""))
-                    if session_timestamp >= start_date:
-                        sessions.append(session_data)
+                if session_data and session_data.get("start_time"):
+                    try:
+                        session_timestamp = datetime.fromisoformat(session_data["start_time"])
+                        if session_timestamp >= start_date:
+                            sessions.append(session_data)
+                    except (ValueError, TypeError):
+                        # Skip sessions with invalid timestamps
+                        pass
 
         total_sessions = len(sessions)
         total_minutes = sum(s.get("duration_seconds", 0) for s in sessions) / 60
@@ -106,7 +130,8 @@ async def get_child_progress_summary(
                 if note.engagement_level:
                     # Convert engagement to numeric
                     engagement_map = {"LOW": 1, "MED": 2, "HIGH": 3}
-                    music_engagement[note.music_style].append(engagement_map.get(note.engagement_level, 2))
+                    eng_val = engagement_map.get(note.engagement_level, 2)
+                    music_engagement[note.music_style].append(eng_val)
 
         # Calculate average engagement per music style
         music_effectiveness = {}
@@ -115,7 +140,8 @@ async def get_child_progress_summary(
             music_effectiveness[style] = {
                 "usage_count": music_usage[style],
                 "avg_engagement": round(avg_engagement, 2),
-                "effectiveness_score": round(avg_engagement * 33.33, 1)  # Convert to 0-100 scale
+                # Convert to 0-100 scale
+                "effectiveness_score": round(avg_engagement * 33.33, 1)
             }
 
         # Recent breakthrough moments
@@ -145,7 +171,9 @@ async def get_child_progress_summary(
             "sessions": {
                 "total": total_sessions,
                 "total_minutes": round(total_minutes, 1),
-                "avg_duration_minutes": round(total_minutes / total_sessions, 1) if total_sessions > 0 else 0
+                "avg_duration_minutes": (
+                    round(total_minutes / total_sessions, 1) if total_sessions > 0 else 0
+                )
             },
             "notes": {
                 "total": len(notes),
@@ -161,7 +189,7 @@ async def get_child_progress_summary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate progress summary: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/{child_id}/goal-progress-timeline")
@@ -176,6 +204,12 @@ async def get_goal_progress_timeline(
     Returns data points for charting goal progress over time
     """
     try:
+        if not azure_storage.container_client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service not available"
+            )
+
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
@@ -183,7 +217,8 @@ async def get_goal_progress_timeline(
         goals_to_analyze = []
         goals_prefix = f"goals/child_{child_id}/"
 
-        async for blob in azure_storage.container_client.list_blobs(name_starts_with=goals_prefix):
+        blobs = azure_storage.container_client.list_blobs(name_starts_with=goals_prefix)
+        async for blob in blobs:
             if blob.name.endswith(".json") and "_progress_" not in blob.name:
                 goal_data = await azure_storage._load_json(blob.name)
                 if goal_data:
@@ -198,14 +233,22 @@ async def get_goal_progress_timeline(
             progress_entries = []
             progress_prefix = f"goals/child_{child_id}/{goal.goal_id}_progress_"
 
-            async for blob in azure_storage.container_client.list_blobs(name_starts_with=progress_prefix):
+            blobs = azure_storage.container_client.list_blobs(
+                name_starts_with=progress_prefix
+            )
+            async for blob in blobs:
                 if blob.name.endswith(".json"):
                     progress_data = await azure_storage._load_json(blob.name)
                     if progress_data:
-                        progress = GoalProgress(**progress_data)
-                        progress_timestamp = datetime.fromisoformat(progress.timestamp)
-                        if progress_timestamp >= start_date:
-                            progress_entries.append(progress)
+                        try:
+                            progress = GoalProgress(**progress_data)
+                            if progress.timestamp:
+                                progress_timestamp = datetime.fromisoformat(progress.timestamp)
+                                if progress_timestamp >= start_date:
+                                    progress_entries.append(progress)
+                        except (ValueError, TypeError):
+                            # Skip entries with invalid data
+                            pass
 
             # Sort by timestamp
             progress_entries.sort(key=lambda p: p.timestamp)
@@ -247,7 +290,7 @@ async def get_goal_progress_timeline(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate goal timeline: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/{child_id}/session-insights")
@@ -266,6 +309,12 @@ async def get_session_insights(
     - Recommended focus areas
     """
     try:
+        if not azure_storage.container_client:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Storage service not available"
+            )
+
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
@@ -273,18 +322,26 @@ async def get_session_insights(
         notes = []
         notes_prefix = "session_notes/"
 
-        async for blob in azure_storage.container_client.list_blobs(name_starts_with=notes_prefix):
+        blobs = azure_storage.container_client.list_blobs(name_starts_with=notes_prefix)
+        async for blob in blobs:
             if blob.name.endswith(".json"):
                 note_data = await azure_storage._load_json(blob.name)
                 if note_data and note_data.get("child_id") == child_id:
-                    note = SessionNote(**note_data)
-                    note_timestamp = datetime.fromisoformat(note.timestamp)
-                    if note_timestamp >= start_date:
-                        notes.append(note)
+                    try:
+                        note = SessionNote(**note_data)
+                        if note.timestamp:
+                            note_timestamp = datetime.fromisoformat(note.timestamp)
+                            if note_timestamp >= start_date:
+                                notes.append(note)
+                    except (ValueError, TypeError):
+                        # Skip notes with invalid data
+                        pass
 
         # Analyze patterns
         strategy_notes = [n for n in notes if n.note_type == NoteType.STRATEGY]
-        breakthrough_notes = [n for n in notes if n.note_type == NoteType.BREAKTHROUGH]
+        breakthrough_notes = [
+            n for n in notes if n.note_type == NoteType.BREAKTHROUGH
+        ]
         challenge_notes = [n for n in notes if n.note_type == NoteType.CHALLENGE]
 
         # Engagement level analysis
@@ -292,7 +349,8 @@ async def get_session_insights(
         for note in notes:
             if note.engagement_level and note.session_phase:
                 engagement_map = {"LOW": 1, "MED": 2, "HIGH": 3}
-                engagement_by_phase[note.session_phase].append(engagement_map.get(note.engagement_level, 2))
+                eng_val = engagement_map.get(note.engagement_level, 2)
+                engagement_by_phase[note.session_phase].append(eng_val)
 
         # Calculate average engagement per phase
         engagement_summary = {}
@@ -310,7 +368,11 @@ async def get_session_insights(
             insights.append({
                 "type": "positive",
                 "title": f"{len(breakthrough_notes)} Breakthrough Moments",
-                "description": f"Child has demonstrated {len(breakthrough_notes)} breakthrough moments in the past {days} days. This indicates positive therapeutic progress.",
+                "description": (
+                    f"Child has demonstrated {len(breakthrough_notes)} breakthrough "
+                    f"moments in the past {days} days. "
+                    "This indicates positive therapeutic progress."
+                ),
                 "priority": "high"
             })
 
@@ -318,7 +380,10 @@ async def get_session_insights(
             insights.append({
                 "type": "concern",
                 "title": "Challenges Exceed Breakthroughs",
-                "description": "Consider reviewing intervention strategies and consulting with therapy team.",
+                "description": (
+                    "Consider reviewing intervention strategies "
+                    "and consulting with therapy team."
+                ),
                 "priority": "high"
             })
 
@@ -326,7 +391,10 @@ async def get_session_insights(
             insights.append({
                 "type": "info",
                 "title": f"{len(strategy_notes)} Strategies Documented",
-                "description": "Good documentation of intervention strategies. Review which strategies correlate with breakthroughs.",
+                "description": (
+                    "Good documentation of intervention strategies. "
+                    "Review which strategies correlate with breakthroughs."
+                ),
                 "priority": "medium"
             })
 
@@ -347,11 +415,15 @@ async def get_session_insights(
             "insights": insights,
             "recent_challenges": [
                 {"content": n.content, "timestamp": n.timestamp}
-                for n in sorted(challenge_notes, key=lambda x: x.timestamp, reverse=True)[:3]
+                for n in sorted(
+                    challenge_notes, key=lambda x: x.timestamp, reverse=True
+                )[:3]
             ],
             "effective_strategies": [
                 {"content": n.content, "timestamp": n.timestamp}
-                for n in sorted(strategy_notes, key=lambda x: x.timestamp, reverse=True)[:3]
+                for n in sorted(
+                    strategy_notes, key=lambda x: x.timestamp, reverse=True
+                )[:3]
             ]
         }
 
@@ -359,4 +431,4 @@ async def get_session_insights(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate session insights: {str(e)}"
-        )
+        ) from e

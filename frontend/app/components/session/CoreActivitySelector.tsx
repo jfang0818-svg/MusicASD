@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Clock, Target, ChevronRight, Sparkles, RotateCcw } from 'lucide-react';
-import { CoreActivity, CORE_ACTIVITIES, CoreActivityType } from '@/app/hooks/useSessionStructure';
+import { Check, Clock, Target, ChevronLeft, ChevronRight, Sparkles, RotateCcw } from 'lucide-react';
+import { CoreActivity, CORE_ACTIVITIES, CoreActivityType, PhaseDefinition, SessionPhase } from '@/app/hooks/useSessionStructure';
 
 interface CoreActivitySelectorProps {
   onConfirm: (activities: CoreActivity[]) => void;
@@ -11,6 +11,10 @@ interface CoreActivitySelectorProps {
   childName?: string;
   recommendedActivities?: CoreActivityType[];
   maxActivities?: number;
+  // Phase navigation props
+  allPhases?: PhaseDefinition[];
+  currentPhaseIndex?: number;
+  onSkipToPhase?: (phaseId: SessionPhase) => void;
 }
 
 // Pre-defined activity templates
@@ -55,6 +59,9 @@ export default function CoreActivitySelector({
   childName,
   recommendedActivities,
   maxActivities = 4,
+  allPhases,
+  currentPhaseIndex,
+  onSkipToPhase,
 }: CoreActivitySelectorProps) {
   const [selectedActivities, setSelectedActivities] = useState<CoreActivity[]>([]);
   const [showTemplates, setShowTemplates] = useState(true);
@@ -128,6 +135,39 @@ export default function CoreActivitySelector({
 
   return (
     <div className="max-w-4xl mx-auto">
+      {/* Phase Navigation */}
+      {allPhases && onSkipToPhase && currentPhaseIndex !== undefined && (
+        <div className="flex items-center justify-end gap-1 mb-4">
+          <button
+            onClick={() => currentPhaseIndex > 0 && onSkipToPhase(allPhases[currentPhaseIndex - 1].id)}
+            disabled={currentPhaseIndex === 0}
+            className={`p-1 rounded-lg transition-all ${
+              currentPhaseIndex === 0
+                ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            aria-label="Previous phase"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[80px] text-center">
+            Phase {currentPhaseIndex + 1} of {allPhases.length}
+          </span>
+          <button
+            onClick={() => currentPhaseIndex < allPhases.length - 1 && onSkipToPhase(allPhases[currentPhaseIndex + 1].id)}
+            disabled={currentPhaseIndex === allPhases.length - 1}
+            className={`p-1 rounded-lg transition-all ${
+              currentPhaseIndex === allPhases.length - 1
+                ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            aria-label="Next phase"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">

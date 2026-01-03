@@ -3,13 +3,14 @@ Azure Blob Storage Service
 Handles all interactions with Azure Blob Storage for user data, profiles, and files
 """
 import json
-import asyncio
-from typing import Optional, Dict, Any, List
+import re
 from datetime import datetime
-from pathlib import Path
-from azure.storage.blob.aio import BlobServiceClient, ContainerClient
+from typing import Any, Dict, List, Optional
+
+from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.storage.blob import ContentSettings
-from azure.core.exceptions import ResourceNotFoundError, ResourceExistsError
+from azure.storage.blob.aio import BlobServiceClient, ContainerClient
+
 from core.config import settings
 
 
@@ -40,12 +41,12 @@ class AzureStorageService:
             # Create container if it doesn't exist
             try:
                 await self.container_client.create_container()
-                print(f"Created container: {self.container_name}")
+                print("Created container: %s", self.container_name)
             except ResourceExistsError:
-                print(f"Container already exists: {self.container_name}")
+                print("Container already exists: %s", self.container_name)
 
         except Exception as e:
-            print(f"Error initializing Azure Storage: {e}")
+            print("Error initializing Azure Storage: %s", e)
             raise
 
     async def close(self):
@@ -175,7 +176,6 @@ class AzureStorageService:
     ) -> Dict[str, Any]:
         """Upload a document for a child profile"""
         # Create safe filename
-        import re
         safe_filename = re.sub(r'[^a-zA-Z0-9._-]', '_', filename)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_filename = f"{timestamp}_{safe_filename}"
@@ -193,8 +193,7 @@ class AzureStorageService:
                 "file_size": len(file_data),
                 "uploaded_at": datetime.now().isoformat()
             }
-        else:
-            raise Exception("Failed to upload document")
+        raise RuntimeError("Failed to upload document")
 
     async def delete_profile_document(
         self, user_id: str, child_id: str, blob_path: str
@@ -219,15 +218,19 @@ class AzureStorageService:
                 blob_client = self.container_client.get_blob_client(blob.name)
                 properties = await blob_client.get_blob_properties()
 
+                content_type = (
+                    properties.content_settings.content_type
+                    or "application/octet-stream"
+                )
                 documents.append({
                     "filename": blob.name.split("/")[-1],  # Extract filename
                     "blob_path": blob.name,
-                    "file_type": properties.content_settings.content_type or "application/octet-stream",
+                    "file_type": content_type,
                     "file_size": properties.size,
                     "uploaded_at": properties.last_modified.isoformat()
                 })
         except Exception as e:
-            print(f"Error listing documents: {e}")
+            print("Error listing documents: %s", e)
 
         return documents
 
@@ -337,7 +340,7 @@ class AzureStorageService:
                     categories_str = metadata.get('categories', file_category)
                     categories = [cat.strip() for cat in categories_str.split(',') if cat.strip()]
                 except Exception as e:
-                    print(f"Error getting metadata for {blob.name}: {e}")
+                    print("Error getting metadata for %s: %s", blob.name, e)
                     categories = [file_category]
 
                 music_files.append({
@@ -383,7 +386,7 @@ class AzureStorageService:
             )
             return True
         except Exception as e:
-            print(f"Error uploading file {blob_path}: {e}")
+            print("Error uploading file %s: %s", blob_path, e)
             return False
 
     async def upload_file_with_metadata(
@@ -399,7 +402,7 @@ class AzureStorageService:
             )
             return True
         except Exception as e:
-            print(f"Error uploading file {blob_path} with metadata: {e}")
+            print("Error uploading file %s with metadata: %s", blob_path, e)
             return False
 
     async def download_file(self, blob_path: str) -> Optional[bytes]:
@@ -411,7 +414,7 @@ class AzureStorageService:
         except ResourceNotFoundError:
             return None
         except Exception as e:
-            print(f"Error downloading file {blob_path}: {e}")
+            print("Error downloading file %s: %s", blob_path, e)
             return None
 
     # Generic JSON operations for activity templates and other data
@@ -435,7 +438,7 @@ class AzureStorageService:
                 blobs.append(blob.name)
             return blobs
         except Exception as e:
-            print(f"Error listing blobs in {path_prefix}: {e}")
+            print("Error listing blobs in %s: %s", path_prefix, e)
             return []
 
     async def get_file_url(self, blob_path: str, expiry_hours: int = 24) -> Optional[str]:
@@ -446,7 +449,7 @@ class AzureStorageService:
             blob_client = self.container_client.get_blob_client(blob_path)
             return blob_client.url
         except Exception as e:
-            print(f"Error getting file URL {blob_path}: {e}")
+            print("Error getting file URL %s: %s", blob_path, e)
             return None
 
     # Email Verification Management
@@ -548,7 +551,7 @@ class AzureStorageService:
             )
             return True
         except Exception as e:
-            print(f"Error saving JSON to {blob_path}: {e}")
+            print("Error saving JSON to %s: %s", blob_path, e)
             return False
 
     async def load_json(self, blob_path: str) -> Optional[Dict[str, Any]]:
@@ -565,7 +568,7 @@ class AzureStorageService:
         except ResourceNotFoundError:
             return None
         except Exception as e:
-            print(f"Error loading JSON from {blob_path}: {e}")
+            print("Error loading JSON from %s: %s", blob_path, e)
             return None
 
     async def _delete_blob(self, blob_path: str) -> bool:
@@ -577,7 +580,7 @@ class AzureStorageService:
         except ResourceNotFoundError:
             return False
         except Exception as e:
-            print(f"Error deleting blob {blob_path}: {e}")
+            print("Error deleting blob %s: %s", blob_path, e)
             return False
 
     async def blob_exists(self, blob_path: str) -> bool:
@@ -589,7 +592,7 @@ class AzureStorageService:
         except ResourceNotFoundError:
             return False
         except Exception as e:
-            print(f"Error checking blob existence {blob_path}: {e}")
+            print("Error checking blob existence %s: %s", blob_path, e)
             return False
 
     # ===================== PLANNED SESSIONS METHODS =====================

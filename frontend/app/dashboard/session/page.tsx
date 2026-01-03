@@ -17,7 +17,7 @@ import { SessionSummaryModal } from '@/app/components/modals/SessionSummaryModal
 import { useSessionStore } from '@/app/store/useSessionStore';
 import { useMusicStore } from '@/app/store/useMusicStore';
 import { motion } from 'framer-motion';
-import { User, Sparkles, AlertCircle, Music, Video } from 'lucide-react';
+import { User, Sparkles, AlertCircle, Music, Video, ChevronLeft, ChevronRight, Mic, MicOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import CameraAudioConsentModal from '@/app/components/CameraAudioConsentModal';
 import RealtimeAnalysisDisplay from '@/app/components/RealtimeAnalysisDisplay';
@@ -82,6 +82,7 @@ function SessionContent() {
   // Local UI state
   const [selectedChildId, _setSelectedChildId] = useState<string>(urlChildId || '');
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
   const [selectedStyle, _setSelectedStyle] = useState<MusicStyle>('calming_regulation');
   const [loading, setLoading] = useState(false);
   const [showStartConfirmModal, setShowStartConfirmModal] = useState(false);
@@ -243,7 +244,7 @@ function SessionContent() {
   // Handle activity selection confirm
   const handleActivitiesConfirm = (activities: CoreActivity[]) => {
     sessionStructure.configureActivities(activities);
-    sessionStructure.startFirstActivity();
+    sessionStructure.startFirstActivity(activities); // Pass activities directly to avoid stale closure
     setShowingActivitySelector(false);
     toast.success(`Starting ${activities.length} activities!`);
   };
@@ -1043,104 +1044,134 @@ function SessionContent() {
           </div>
         )}
 
-        {/* Active Session Header */}
+        {/* Active Session Header - Compact */}
         {sessionActive && selectedChild && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-3xl p-6 shadow-lg text-white"
+            className="bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl px-4 py-3 shadow-md text-white"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl">🎵</span>
+            <div className="flex items-center justify-between gap-4">
+              {/* Left: Session Info */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg">🎵</span>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Active Session</h2>
-                  <p className="text-green-100">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold leading-tight">Active Session</h2>
+                  <p className="text-green-100 text-xs truncate">
                     {selectedChild.demographics.name} • {sessionId}
                   </p>
                 </div>
               </div>
+
+              {/* Center: Feature Buttons */}
+              <div className="flex flex-wrap gap-2 items-center justify-center flex-1">
+                <button
+                  onClick={() => setShowActivityModal(true)}
+                  disabled={!sessionActive}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/80 to-pink-500/80 hover:from-purple-600/80 hover:to-pink-600/80 disabled:bg-white/10 text-white rounded-lg transition-all text-xs font-semibold shadow"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Activities
+                </button>
+
+                <button
+                  onClick={() => setShowConsentModal(true)}
+                  disabled={analysisEnabled}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 disabled:bg-white/10 text-white rounded-lg transition-all text-xs"
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  {analysisEnabled ? 'Analysis On' : 'Real-time Analysis'}
+                </button>
+
+                {analysisEnabled && (
+                  <>
+                    <button
+                      onClick={handleStopAnalysis}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/80 hover:bg-red-600/80 text-white rounded-lg transition-all text-xs"
+                    >
+                      Stop
+                    </button>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoAdaptEnabled}
+                        onChange={(e) => setAutoAdaptEnabled(e.target.checked)}
+                        className="rounded w-3 h-3"
+                      />
+                      <span>Auto-Adapt</span>
+                    </label>
+                  </>
+                )}
+
+                <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sessionStructureEnabled}
+                    onChange={(e) => setSessionStructureEnabled(e.target.checked)}
+                    className="rounded w-3 h-3"
+                  />
+                  <span>📅 Structured</span>
+                </label>
+
+                {/* Phase Navigation - Always visible when structured session enabled */}
+                {sessionStructureEnabled && sessionStructure.currentPhase && (
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-white/40 rounded-lg border border-white/30">
+                    <button
+                      onClick={() => sessionStructure.currentPhaseIndex > 0 && sessionStructure.skipToPhase(sessionStructure.allPhases[sessionStructure.currentPhaseIndex - 1].id)}
+                      disabled={sessionStructure.currentPhaseIndex === 0}
+                      className={`p-1 rounded transition-all ${
+                        sessionStructure.currentPhaseIndex === 0
+                          ? 'text-white/30 cursor-not-allowed'
+                          : 'text-white hover:bg-white/20'
+                      }`}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm text-white font-bold min-w-[90px] text-center">
+                      {sessionStructure.currentPhase.icon} Phase {sessionStructure.currentPhaseIndex + 1}/{sessionStructure.allPhases.length}
+                    </span>
+                    <button
+                      onClick={() => sessionStructure.currentPhaseIndex < sessionStructure.allPhases.length - 1 && sessionStructure.skipToPhase(sessionStructure.allPhases[sessionStructure.currentPhaseIndex + 1].id)}
+                      disabled={sessionStructure.currentPhaseIndex === sessionStructure.allPhases.length - 1}
+                      className={`p-1 rounded transition-all ${
+                        sessionStructure.currentPhaseIndex === sessionStructure.allPhases.length - 1
+                          ? 'text-white/30 cursor-not-allowed'
+                          : 'text-white hover:bg-white/20'
+                      }`}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all text-xs cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={coachingEnabled}
+                    onChange={(e) => setCoachingEnabled(e.target.checked)}
+                    className="rounded w-3 h-3"
+                  />
+                  <span>💡 Coaching</span>
+                </label>
+
+                <button
+                  onClick={() => setShowAIMusicModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500/80 to-orange-500/80 hover:from-purple-600/80 hover:to-orange-600/80 text-white rounded-lg transition-all text-xs"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  AI Music
+                </button>
+              </div>
+
+              {/* Right: Stop Button */}
               <button
                 onClick={handleStopSession}
                 disabled={loading}
-                className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50"
+                className="bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded-lg font-semibold transition-all disabled:opacity-50 text-sm flex-shrink-0"
               >
-                {loading ? 'Stopping...' : '⏹ Stop Session'}
-              </button>
-            </div>
-
-            {/* Advanced Features Buttons */}
-            <div className="flex flex-wrap gap-3 items-center">
-              <button
-                onClick={() => setShowActivityModal(true)}
-                disabled={!sessionActive}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/80 to-pink-500/80 hover:from-purple-600/80 hover:to-pink-600/80 disabled:bg-white/10 text-white rounded-xl transition-all text-sm font-semibold shadow-lg"
-              >
-                <Sparkles className="h-4 w-4" />
-                🎮 Activities
-              </button>
-
-              <button
-                onClick={() => setShowConsentModal(true)}
-                disabled={analysisEnabled}
-                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 disabled:bg-white/10 text-white rounded-xl transition-all text-sm"
-              >
-                <Video className="h-4 w-4" />
-                {analysisEnabled ? 'Analysis Active' : 'Enable Real-time Analysis'}
-              </button>
-
-              {analysisEnabled && (
-                <>
-                  <button
-                    onClick={handleStopAnalysis}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-600/80 text-white rounded-xl transition-all text-sm"
-                  >
-                    Stop Analysis
-                  </button>
-
-                  {/* Feature 1: Auto-Adapt Toggle */}
-                  <label className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoAdaptEnabled}
-                      onChange={(e) => setAutoAdaptEnabled(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>🤖 Auto-Adapt Music</span>
-                  </label>
-                </>
-              )}
-
-              {/* Feature 2: Session Structure Toggle */}
-              <label className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sessionStructureEnabled}
-                  onChange={(e) => setSessionStructureEnabled(e.target.checked)}
-                  className="rounded"
-                />
-                <span>📅 Structured Session</span>
-              </label>
-
-              {/* Feature 4: Parent Coaching Toggle */}
-              <label className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={coachingEnabled}
-                  onChange={(e) => setCoachingEnabled(e.target.checked)}
-                  className="rounded"
-                />
-                <span>💡 Parent Coaching</span>
-              </label>
-
-              <button
-                onClick={() => setShowAIMusicModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/80 to-orange-500/80 hover:from-purple-600/80 hover:to-orange-600/80 text-white rounded-xl transition-all text-sm"
-              >
-                <Sparkles className="h-4 w-4" />
-                Generate AI Music
+                {loading ? 'Stopping...' : '⏹ Stop'}
               </button>
             </div>
           </motion.div>
@@ -1171,9 +1202,9 @@ function SessionContent() {
           />
         )}
 
-      {/* Main Content Grid - Split Screen Layout */}
+      {/* Main Content - Conditional Layout based on Analysis */}
       {sessionActive && (
-        <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-240px)]">
+        <div className={`h-[calc(100vh-240px)] ${analysisEnabled ? 'grid grid-cols-[1fr_320px] gap-4' : ''}`}>
           {/* Left Column - Session Structure & AI Assistant & Engagement */}
           <div className="flex flex-col gap-6 h-full overflow-y-auto">
             {/* Feature 2: Visual Schedule - Show for Hello/Goodbye phases */}
@@ -1212,6 +1243,9 @@ function SessionContent() {
                     setShowingActivitySelector(false);
                   }}
                   childName={selectedChild?.demographics?.name}
+                  allPhases={sessionStructure.allPhases}
+                  currentPhaseIndex={sessionStructure.currentPhaseIndex}
+                  onSkipToPhase={sessionStructure.skipToPhase}
                 />
               </div>
             )}
@@ -1236,36 +1270,183 @@ function SessionContent() {
                 onSkipToActivity={(id) => sessionStructure.skipToActivity(id as any)}
                 musicStyle={currentStyle}
                 onPlayMusic={(style) => handlePlayMusic(style as any)}
+                // Phase navigation props
+                allPhases={sessionStructure.allPhases}
+                currentPhaseIndex={sessionStructure.currentPhaseIndex}
+                onSkipToPhase={sessionStructure.skipToPhase}
               />
             )}
-            {/* AI Therapy Assistant Card */}
-            <div className="card p-6 flex-shrink-0">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">AI Therapy Assistant</h2>
-                <CameraSection
-                  cameraEnabled={cameraEnabled}
-                  setCameraEnabled={setCameraEnabled}
+
+            {/* Fallback Phase Navigation - Shows when no phase-specific component is visible */}
+            {sessionStructureEnabled &&
+             !sessionStructure.isComplete &&
+             sessionStructure.currentPhase?.id === 'activity' &&
+             !sessionStructure.currentActivity &&
+             !showingActivitySelector && (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    📅 Session Structure
+                  </h3>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => sessionStructure.currentPhaseIndex > 0 && sessionStructure.skipToPhase(sessionStructure.allPhases[sessionStructure.currentPhaseIndex - 1].id)}
+                      disabled={sessionStructure.currentPhaseIndex === 0}
+                      className={`p-1 rounded-lg transition-all ${
+                        sessionStructure.currentPhaseIndex === 0
+                          ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[80px] text-center">
+                      Phase {sessionStructure.currentPhaseIndex + 1} of {sessionStructure.allPhases.length}
+                    </span>
+                    <button
+                      onClick={() => sessionStructure.currentPhaseIndex < sessionStructure.allPhases.length - 1 && sessionStructure.skipToPhase(sessionStructure.allPhases[sessionStructure.currentPhaseIndex + 1].id)}
+                      disabled={sessionStructure.currentPhaseIndex === sessionStructure.allPhases.length - 1}
+                      className={`p-1 rounded-lg transition-all ${
+                        sessionStructure.currentPhaseIndex === sessionStructure.allPhases.length - 1
+                          ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                  Currently in <strong>Core Activities</strong> phase. Use the Activities button above or navigate to another phase.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setShowingActivitySelector(true)}
+                    className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    Select Activities
+                  </button>
+                  <button
+                    onClick={() => sessionStructure.skipToPhase('goodbye')}
+                    className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    Skip to Goodbye
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* AI Therapy Assistant Card - Only show when camera, audio, or analysis is enabled */}
+            {(cameraEnabled || audioEnabled || analysisEnabled) && (
+              <div className="card p-6 flex-shrink-0">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold">AI Therapy Assistant</h2>
+                  <div className="flex items-center gap-2">
+                    {/* Audio Toggle Button */}
+                    <button
+                      onClick={() => {
+                        if (!sessionActive) {
+                          toast.error('Please start a session first');
+                          return;
+                        }
+                        setAudioEnabled(!audioEnabled);
+                        toast.success(audioEnabled ? 'Audio disabled' : 'Audio enabled');
+                      }}
+                      disabled={!sessionActive}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                        audioEnabled
+                          ? 'bg-red-500 hover:bg-red-600 text-white'
+                          : 'bg-green-500 hover:bg-green-600 text-white'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      {audioEnabled ? (
+                        <>
+                          <MicOff className="h-4 w-4" />
+                          Turn Off Audio
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="h-4 w-4" />
+                          Turn On Audio
+                        </>
+                      )}
+                    </button>
+                    <CameraSection
+                      cameraEnabled={cameraEnabled}
+                      setCameraEnabled={setCameraEnabled}
+                      sessionActive={sessionActive}
+                    />
+                  </div>
+                </div>
+
+                <EngagementControls
+                  engagement={engagement}
+                  updateEngagement={updateEngagement}
                   sessionActive={sessionActive}
+                  autoSuggest={autoSuggest}
+                  setAutoSuggest={setAutoSuggest}
+                />
+
+                <SuggestionPanel
+                  sessionActive={sessionActive}
+                  currentSuggestion={currentSuggestion}
+                  generateSuggestion={() => generateSuggestion(engagement)}
+                  acceptSuggestion={acceptSuggestion}
+                  skipSuggestion={skipSuggestion}
+                  logResponse={logResponse}
                 />
               </div>
+            )}
 
-              <EngagementControls
-                engagement={engagement}
-                updateEngagement={updateEngagement}
-                sessionActive={sessionActive}
-                autoSuggest={autoSuggest}
-                setAutoSuggest={setAutoSuggest}
-              />
-
-              <SuggestionPanel
-                sessionActive={sessionActive}
-                currentSuggestion={currentSuggestion}
-                generateSuggestion={() => generateSuggestion(engagement)}
-                acceptSuggestion={acceptSuggestion}
-                skipSuggestion={skipSuggestion}
-                logResponse={logResponse}
-              />
-            </div>
+            {/* Compact controls to enable AI Assistant when hidden */}
+            {!(cameraEnabled || audioEnabled || analysisEnabled) && (
+              <div className="card p-4 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-700">AI Therapy Assistant</h2>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (!sessionActive) {
+                          toast.error('Please start a session first');
+                          return;
+                        }
+                        setAudioEnabled(true);
+                        toast.success('Audio enabled');
+                      }}
+                      disabled={!sessionActive}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm bg-green-500 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Mic className="h-4 w-4" />
+                      Audio
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!sessionActive) {
+                          toast.error('Please start a session first');
+                          return;
+                        }
+                        setCameraEnabled(true);
+                        toast.success('Camera enabled');
+                      }}
+                      disabled={!sessionActive}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Video className="h-4 w-4" />
+                      Camera
+                    </button>
+                    <button
+                      onClick={() => setShowConsentModal(true)}
+                      disabled={!sessionActive}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-sm bg-purple-500 hover:bg-purple-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Real-time Analysis
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Enable camera, audio, or real-time analysis to use AI Therapy Assistant</p>
+              </div>
+            )}
 
             {/* Feature 4: Parent Coaching Panel */}
             {coachingEnabled && (
@@ -1306,27 +1487,16 @@ function SessionContent() {
             </div>
           </div>
 
-          {/* Right Column - Music Controls */}
-          <div className="card p-6 h-full overflow-y-auto">
-            <MusicControls
-              sessionActive={sessionActive}
-              volume={volume}
-              setVolume={setVolume}
-              selectedStyle={selectedStyle}
-              playMusic={handlePlayMusic}
-              stopMusic={handleStopMusic}
-              musicPlaying={musicPlaying}
-              currentMusic={currentMusic}
-              loading={musicLoading}
-              musicLibrary={musicLibrary}
-              generatedTones={generatedTones}
-              loadMusicLibrary={loadMusicLibrary}
-              loadGeneratedTones={loadGeneratedTones}
-              setShowMusicModal={setShowMusicModal}
-              setShowGeneratedModal={setShowGeneratedModal}
-              setShowGenerateModal={setShowGenerateModal}
-            />
-          </div>
+          {/* Right Column - Real-time Analysis (only when enabled) */}
+          {analysisEnabled && (
+            <div className="h-full overflow-y-auto">
+              <RealtimeAnalysisDisplay
+                analysis={latestAnalysis}
+                isConnected={isConnected}
+                videoStream={videoStream}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -1412,19 +1582,12 @@ function SessionContent() {
           onClose={() => setShowActivityModal(false)}
           sessionId={sessionId}
           childId={selectedChildId}
+          allPhases={sessionStructure.allPhases}
+          currentPhaseIndex={sessionStructure.currentPhaseIndex}
+          onSkipToPhase={sessionStructure.skipToPhase}
         />
       )}
 
-      {/* Real-time Analysis Display */}
-      {analysisEnabled && sessionActive && (
-        <div className="fixed bottom-6 right-6 w-96 z-40">
-          <RealtimeAnalysisDisplay
-            analysis={latestAnalysis}
-            isConnected={isConnected}
-            videoStream={videoStream}
-          />
-        </div>
-      )}
     </div>
     </div>
   );

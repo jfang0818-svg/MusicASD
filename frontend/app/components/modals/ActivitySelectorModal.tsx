@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Music, Brain, Book, Activity, Heart, Sparkles } from 'lucide-react';
+import { X, Music, Brain, Book, Activity, Heart, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PhaseDefinition, SessionPhase } from '@/app/hooks/useSessionStructure';
 import SoundMatchingGame from '../activities/SoundMatchingGame';
 import AmbientMusicPlayer from '../activities/AmbientMusicPlayer';
 import MusicalStorytelling from '../activities/MusicalStorytelling';
@@ -15,6 +16,10 @@ interface ActivitySelectorModalProps {
   onClose: () => void;
   sessionId: string;
   childId: string;
+  // Phase navigation props
+  allPhases?: PhaseDefinition[];
+  currentPhaseIndex?: number;
+  onSkipToPhase?: (phaseId: SessionPhase) => void;
 }
 
 type ActivityType = 'sound-matching' | 'ambient' | 'storytelling' | 'recommendations' | 'movement' | 'emotion' | null;
@@ -70,7 +75,15 @@ const activities = [
   }
 ];
 
-export default function ActivitySelectorModal({ isOpen, onClose, sessionId, childId }: ActivitySelectorModalProps) {
+export default function ActivitySelectorModal({
+  isOpen,
+  onClose,
+  sessionId,
+  childId,
+  allPhases,
+  currentPhaseIndex,
+  onSkipToPhase,
+}: ActivitySelectorModalProps) {
   const [selectedActivity, setSelectedActivity] = useState<ActivityType>(null);
 
   const handleBack = () => {
@@ -89,7 +102,7 @@ export default function ActivitySelectorModal({ isOpen, onClose, sessionId, chil
           className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-3">
               {selectedActivity && (
                 <button
@@ -99,16 +112,52 @@ export default function ActivitySelectorModal({ isOpen, onClose, sessionId, chil
                   ← Back
                 </button>
               )}
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-gray-800">
                 {selectedActivity ? activities.find(a => a.id === selectedActivity)?.name : 'Select Activity'}
               </h2>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
+
+            {/* Phase Navigation */}
+            <div className="flex items-center gap-4">
+              {allPhases && onSkipToPhase && currentPhaseIndex !== undefined && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => currentPhaseIndex > 0 && onSkipToPhase(allPhases[currentPhaseIndex - 1].id)}
+                    disabled={currentPhaseIndex === 0}
+                    className={`p-1 rounded-lg transition-all ${
+                      currentPhaseIndex === 0
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    aria-label="Previous phase"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <span className="text-xs text-gray-500 min-w-[80px] text-center">
+                    Phase {currentPhaseIndex + 1} of {allPhases.length}
+                  </span>
+                  <button
+                    onClick={() => currentPhaseIndex < allPhases.length - 1 && onSkipToPhase(allPhases[currentPhaseIndex + 1].id)}
+                    disabled={currentPhaseIndex === allPhases.length - 1}
+                    className={`p-1 rounded-lg transition-all ${
+                      currentPhaseIndex === allPhases.length - 1
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    }`}
+                    aria-label="Next phase"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}

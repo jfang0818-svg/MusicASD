@@ -277,9 +277,11 @@ export function useSessionStructure({
   }, []);
 
   // Start the first activity (called when entering activity phase)
-  const startFirstActivity = useCallback(() => {
-    if (selectedActivities.length > 0) {
-      const firstActivity = selectedActivities[0];
+  // Can optionally pass activities directly to avoid stale closure issue
+  const startFirstActivity = useCallback((activitiesOverride?: CoreActivity[]) => {
+    const activities = activitiesOverride || selectedActivities;
+    if (activities.length > 0) {
+      const firstActivity = activities[0];
       setCurrentActivityIndex(0);
       setActivityStartTime(new Date());
       setActivityElapsedSeconds(0);

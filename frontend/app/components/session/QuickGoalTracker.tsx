@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Target, Check } from 'lucide-react';
+import { Target, Check, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface TherapyGoal {
   goal_id: string;
@@ -140,7 +140,7 @@ export default function QuickGoalTracker({
   onGoalUpdate
 }: QuickGoalTrackerProps) {
   const [goals, setGoals] = useState<QuickGoal[]>([]);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Initialize goals from backend or use defaults
   useEffect(() => {
@@ -187,9 +187,19 @@ export default function QuickGoalTracker({
         </div>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
-          {isCollapsed ? 'Expand' : 'Collapse'}
+          {isCollapsed ? (
+            <>
+              <ChevronRight className="h-4 w-4" />
+              Expand
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4" />
+              Collapse
+            </>
+          )}
         </button>
       </div>
 

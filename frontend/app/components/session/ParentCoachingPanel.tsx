@@ -81,10 +81,10 @@ export default function ParentCoachingPanel({
         </div>
         <div>
           <h3 className="font-bold text-gray-900 dark:text-white">
-            Parent Coaching
+            Coaching Tips
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Real-time guidance for caregivers
+            Real-time guidance
           </p>
         </div>
       </div>

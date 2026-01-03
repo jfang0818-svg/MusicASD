@@ -2,12 +2,13 @@
 Emotion-Matching Music API endpoints
 Adaptive music based on emotional state using iso-principle
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 import logging
 import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -227,7 +228,7 @@ async def detect_emotion_manual(
     # Get recommended music transition path
     transition_path = ISO_TRANSITIONS.get(observed_emotion, [])
 
-    logger.info(f"Detected emotion {observed_emotion} for child {child_id}")
+    logger.info("Detected emotion %s for child %s", observed_emotion, child_id)
 
     return {
         "detection_id": detection_id,
@@ -310,7 +311,9 @@ async def start_emotion_music_session(
     # Get first phase music characteristics
     first_phase = transition_plan[0]
 
-    logger.info(f"Started emotion music session {emotion_session_id} for child {child_id}")
+    logger.info(
+        "Started emotion music session %s for child %s", emotion_session_id, child_id
+    )
 
     return {
         "status": "started",
@@ -398,7 +401,10 @@ async def record_emotion_check(
         "phase": emotion_session["current_phase"]
     })
 
-    logger.info(f"Emotion check for {emotion_session_id}: {current_emotion} (intensity: {intensity})")
+    logger.info(
+        "Emotion check for %s: %s (intensity: %s)",
+        emotion_session_id, current_emotion, intensity
+    )
 
     return {
         "status": "recorded",
@@ -493,7 +499,10 @@ async def end_emotion_music_session(
         "notes": notes
     })
 
-    logger.info(f"Ended emotion music session {emotion_session_id}: {emotion_session['initial_emotion']} → {final_emotion}")
+    logger.info(
+        "Ended emotion music session %s: %s -> %s",
+        emotion_session_id, emotion_session['initial_emotion'], final_emotion
+    )
 
     return {
         "status": "completed",
@@ -522,7 +531,7 @@ async def get_emotion_music_history(
 
     # List all sessions
     prefix = f"activities/emotion_music/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     sessions = []
     for blob_name in blob_names[:limit]:

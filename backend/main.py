@@ -1,9 +1,10 @@
 """
 Project ASD Backend Server - Main Entry Point
 """
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 import logging
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import pygame
 import uvicorn
 
@@ -17,7 +18,13 @@ from core.config import settings
 from core.state import SessionState
 
 # Import API routers
-from api import analytics, engagement, music, music_response, session, camera, health, auth, profile, websocket_analysis, goals, session_notes, child_analytics, home_routines, notifications, interactive_activities, session_videos, gamification, favorites, freeze_game, sound_matching, ambient_music, musical_storytelling, music_recommendations, movement_activities, emotion_music, tracking, planned_sessions, ai_session_planner, ai_activity_generator, templates
+from api import (
+    analytics, engagement, music, music_response, session, camera, health, auth, profile,
+    websocket_analysis, goals, session_notes, child_analytics, home_routines, notifications,
+    interactive_activities, session_videos, gamification, favorites, freeze_game, sound_matching,
+    ambient_music, musical_storytelling, music_recommendations, movement_activities, emotion_music,
+    tracking, planned_sessions, ai_session_planner, ai_activity_generator, templates
+)
 
 # Import services
 from services.azure_storage import azure_storage
@@ -60,7 +67,7 @@ try:
     )
     logger.info("Pygame mixer initialized successfully")
 except Exception as e:
-    logger.error(f"Failed to initialize pygame mixer: {e}")
+    logger.error("Failed to initialize pygame mixer: %s", e)
 
 # Initialize global state
 state = SessionState()
@@ -124,8 +131,8 @@ def read_root():
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
-    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info("Starting %s v%s", settings.APP_NAME, settings.APP_VERSION)
+    logger.info("Environment: %s", settings.ENVIRONMENT)
 
     # Initialize Redis
     try:
@@ -135,7 +142,7 @@ async def startup_event():
         else:
             logger.warning("⚠ Redis not available - running without caching")
     except Exception as e:
-        logger.warning(f"⚠ Redis initialization failed: {e}")
+        logger.warning("Redis initialization failed: %s", e)
 
     # Initialize Azure Blob Storage
     if settings.AZURE_STORAGE_CONNECTION_STRING:
@@ -143,16 +150,16 @@ async def startup_event():
             await azure_storage.initialize()
             logger.info("✓ Azure Blob Storage initialized successfully")
         except Exception as e:
-            logger.error(f"✗ Failed to initialize Azure Blob Storage: {e}")
+            logger.error("Failed to initialize Azure Blob Storage: %s", e)
     else:
         logger.warning("⚠ Azure Blob Storage not configured (connection string missing)")
 
     # Display music library status
     logger.info("Music Library Status:")
     for style, files in state.music_library.items():
-        logger.info(f"  {style}: {len(files)} files")
+        logger.info("  %s: %d files", style, len(files))
 
-    logger.info(f"Server ready at http://localhost:{settings.PORT}")
+    logger.info("Server ready at http://localhost:%s", settings.PORT)
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -175,7 +182,7 @@ async def shutdown_event():
         redis_client.close()
         logger.info("✓ Redis connection closed")
     except Exception as e:
-        logger.error(f"Error closing Redis: {e}")
+        logger.error("Error closing Redis: %s", e)
 
     # Close Azure Blob Storage connection
     if settings.AZURE_STORAGE_CONNECTION_STRING:
@@ -183,7 +190,7 @@ async def shutdown_event():
             await azure_storage.close()
             logger.info("✓ Azure Blob Storage connection closed")
         except Exception as e:
-            logger.error(f"✗ Error closing Azure Blob Storage: {e}")
+            logger.error("Error closing Azure Blob Storage: %s", e)
 
     logger.info("Server shutdown complete")
 
@@ -211,5 +218,6 @@ if __name__ == "__main__":
         app,
         host=settings.HOST,
         port=settings.PORT,
-        reload=settings.RELOAD
+        reload=settings.RELOAD,
+        timeout_keep_alive=300,  # 5 minutes for long-running requests like music generation
     )

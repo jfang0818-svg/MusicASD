@@ -146,6 +146,14 @@ export function PlanSessionModal({
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
 
+  // Sync childId prop with state when modal opens
+  useEffect(() => {
+    if (show && childId) {
+      setSelectedChildId(childId);
+      setSelectedChildName(childName);
+    }
+  }, [show, childId, childName]);
+
   // Fetch custom templates on mount
   useEffect(() => {
     if (show) {
@@ -352,9 +360,6 @@ export function PlanSessionModal({
     }
 
     onSave(sessionData);
-    if (!saveAsTemplate) {
-      toast.success(editSession ? `Session plan created for ${selectedChildName}!` : 'Session plan created!');
-    }
     onClose();
   };
 

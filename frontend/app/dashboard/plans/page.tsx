@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -13,6 +13,7 @@ import { format, isPast, isToday, isTomorrow } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function SessionPlansPage() {
+  console.log('[PlansPage] Component rendering');
   const router = useRouter();
   const queryClient = useQueryClient();
   const [selectedChildId, setSelectedChildId] = useState<string>('all');
@@ -28,10 +29,25 @@ export default function SessionPlansPage() {
     queryFn: getChildProfiles,
   });
 
-  const { data: allPlannedSessions = [], isLoading: sessionsLoading } = useQuery({
+  const { data: allPlannedSessions = [], isLoading: sessionsLoading, error: sessionsError, refetch } = useQuery({
     queryKey: ['planned-sessions'],
-    queryFn: () => getPlannedSessions(),
+    queryFn: async () => {
+      console.log('[PlansPage] Fetching planned sessions...');
+      const result = await getPlannedSessions();
+      console.log('[PlansPage] Got sessions:', result);
+      return result;
+    },
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
   });
+
+  // Force refetch on mount to clear stale cache
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  console.log('[PlansPage] sessionsLoading:', sessionsLoading, 'error:', sessionsError, 'count:', allPlannedSessions.length);
 
   const deleteMutation = useMutation({
     mutationFn: deletePlannedSession,
@@ -122,7 +138,14 @@ export default function SessionPlansPage() {
   };
 
   const handleSavePlan = async (sessionData: Omit<PlannedSession, 'id' | 'createdAt' | 'updatedAt'>) => {
-    // This will be handled by PlanSessionModal's onSave which calls the API
+    try {
+      await createPlannedSession(sessionData as any);
+      queryClient.invalidateQueries({ queryKey: ['planned-sessions'] });
+      toast.success('Session plan created!');
+    } catch (error) {
+      console.error('Error creating session plan:', error);
+      toast.error('Failed to create session plan');
+    }
   };
 
   const handlePlanWithAI = () => {

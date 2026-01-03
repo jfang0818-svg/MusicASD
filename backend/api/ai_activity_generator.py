@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 import json
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials
@@ -16,7 +16,7 @@ from models.activity_templates import (
     ActivityTemplate, ActivityCategory, DifficultyLevel,
     GenerateActivityRequest, GenerateActivityResponse,
     ActivityChatRequest, ActivityChatResponse,
-    SaveActivityRequest, ListActivitiesRequest,
+    SaveActivityRequest,
     ActivityPhase, TherapeuticGoal, SensoryRequirements, SensoryIntensity,
     MaterialItem, ParticipantRole
 )
@@ -322,7 +322,7 @@ ACTIVE THERAPY GOALS:
 {chr(10).join(f"- {g}" for g in active_goals) if active_goals else "No active goals set"}
 """
     except Exception as e:
-        logger.error(f"Error building child context: {e}")
+        logger.error("Error building child context: %s", e)
         return "Error loading child profile. Generate a general activity template."
 
 
@@ -347,7 +347,7 @@ async def generate_activity(
 
         # Call GPT
         response = await gpt_client.client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Generate an activity based on the requirements above."}
@@ -420,8 +420,10 @@ async def generate_activity(
         )
 
     except Exception as e:
-        logger.error(f"Error generating activity: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate activity: {str(e)}")
+        logger.error("Error generating activity: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate activity: {str(e)}"
+        ) from e
 
 
 @router.post("/chat", response_model=ActivityChatResponse)
@@ -452,7 +454,7 @@ async def chat_activity_wizard(
 
         # Call GPT
         response = await gpt_client.client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=messages,
             temperature=0.7,
             response_format={"type": "json_object"}
@@ -495,7 +497,7 @@ async def chat_activity_wizard(
             try:
                 activity = ActivityTemplate(**activity_data)
             except Exception as e:
-                logger.warning(f"Could not parse activity: {e}")
+                logger.warning("Could not parse activity: %s", e)
                 activity = None
 
         return ActivityChatResponse(
@@ -506,8 +508,8 @@ async def chat_activity_wizard(
         )
 
     except Exception as e:
-        logger.error(f"Error in activity chat: {e}")
-        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+        logger.error("Error in activity chat: %s", e)
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}") from e
 
 
 @router.post("/save")
@@ -533,8 +535,10 @@ async def save_activity(
         return {"success": True, "activity_id": request.activity.id, "path": path}
 
     except Exception as e:
-        logger.error(f"Error saving activity: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save activity: {str(e)}")
+        logger.error("Error saving activity: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save activity: {str(e)}"
+        ) from e
 
 
 @router.get("/templates")
@@ -567,8 +571,10 @@ async def list_activity_templates(
         return {"activities": activities, "total": len(activities)}
 
     except Exception as e:
-        logger.error(f"Error listing templates: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to list templates: {str(e)}")
+        logger.error("Error listing templates: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list templates: {str(e)}"
+        ) from e
 
 
 @router.get("/templates/{activity_id}")
@@ -591,8 +597,10 @@ async def get_activity_template(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting activity: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get activity: {str(e)}")
+        logger.error("Error getting activity: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get activity: {str(e)}"
+        ) from e
 
 
 @router.delete("/templates/{activity_id}")
@@ -610,5 +618,7 @@ async def delete_activity_template(
         return {"success": True, "deleted": activity_id}
 
     except Exception as e:
-        logger.error(f"Error deleting activity: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete activity: {str(e)}")
+        logger.error("Error deleting activity: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete activity: {str(e)}"
+        ) from e

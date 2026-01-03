@@ -7,7 +7,7 @@ import { Toaster } from 'react-hot-toast';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'SonicSoothe - Music Therapy Application',
+  title: 'MusicASD - Music Therapy Application',
   description: 'Interactive music therapy application with real-time engagement monitoring',
   keywords: 'music therapy, ASD, autism, engagement, interactive',
 };

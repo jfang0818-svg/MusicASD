@@ -2,8 +2,6 @@
 AI Session Planner API endpoints
 Provides AI-powered session planning assistance with chat interface
 """
-
-from datetime import datetime
 import logging
 from typing import List, Dict, Any
 import json
@@ -83,9 +81,9 @@ async def chat_with_planner(
         # Add user's latest message
         messages.append({"role": "user", "content": request.userMessage})
 
-        # Call GPT
+        # Call GPT (using gpt-4o which supports JSON response format)
         response = await gpt_client.client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=messages,
             temperature=0.7,
             response_format={"type": "json_object"}
@@ -104,8 +102,23 @@ async def chat_with_planner(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error in AI session planner chat: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process chat request")
+        import traceback
+        logger.error("Error in AI session planner chat: %s", e)
+        logger.error("Traceback: %s", traceback.format_exc())
+        raise HTTPException(
+            status_code=500, detail=f"Failed to process chat request: {str(e)}"
+        ) from e
+
+
+def _safe_join(value, default='Not specified') -> str:
+    """Safely join a value that might be a list, string, or None"""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value if value else default
+    if isinstance(value, list):
+        return ', '.join(str(v) for v in value) if value else default
+    return str(value) if value else default
 
 
 def _build_planning_context(
@@ -143,8 +156,8 @@ COMMUNICATION:
 - Attention Span: {behavioral.get('attention_span', 'Not specified')}
 
 MUSIC PREFERENCES:
-- Preferred Genres: {', '.join(music_prefs.get('preferred_genres', [])) or 'Not specified'}
-- Preferred Instruments: {', '.join(music_prefs.get('preferred_instruments', [])) or 'Not specified'}
+- Preferred Genres: {_safe_join(music_prefs.get('preferred_genres'))}
+- Preferred Instruments: {_safe_join(music_prefs.get('preferred_instruments'))}
 - Successful Therapy Music: {music_prefs.get('successful_therapy_music', 'Not specified')}
 
 CURRENT THERAPY GOALS:
@@ -187,11 +200,20 @@ def _analyze_session_patterns(sessions: List[Dict[str, Any]]) -> str:
 
     avg_duration = avg_duration / len(sessions) if sessions else 0
 
+    top_activities = sorted(
+        activity_counts.items(), key=lambda x: x[1], reverse=True
+    )[:3]
+    top_music = sorted(
+        music_counts.items(), key=lambda x: x[1], reverse=True
+    )[:3]
+    activities_str = ', '.join([f"{k} ({v}x)" for k, v in top_activities])
+    music_str = ', '.join([f"{k} ({v}x)" for k, v in top_music])
+
     summary = f"""- Total sessions analyzed: {len(sessions)}
 - Average session duration: {avg_duration:.0f} minutes
 - Successful sessions: {successful_sessions}/{len(sessions)}
-- Most used activities: {', '.join([f"{k} ({v}x)" for k, v in sorted(activity_counts.items(), key=lambda x: x[1], reverse=True)[:3]])}
-- Most used music styles: {', '.join([f"{k} ({v}x)" for k, v in sorted(music_counts.items(), key=lambda x: x[1], reverse=True)[:3]])}"""
+- Most used activities: {activities_str}
+- Most used music styles: {music_str}"""
 
     return summary
 
@@ -201,8 +223,16 @@ def _analyze_music_responses(responses: List[Dict[str, Any]]) -> str:
     if not responses:
         return "No music response data available yet."
 
-    positive_responses = [r for r in responses if r.get("emotional_response", "").lower() in ["happy", "calm", "engaged"]]
-    negative_responses = [r for r in responses if r.get("emotional_response", "").lower() in ["distressed", "overwhelmed", "disengaged"]]
+    positive_emotions = ["happy", "calm", "engaged"]
+    negative_emotions = ["distressed", "overwhelmed", "disengaged"]
+    positive_responses = [
+        r for r in responses
+        if r.get("emotional_response", "").lower() in positive_emotions
+    ]
+    negative_responses = [
+        r for r in responses
+        if r.get("emotional_response", "").lower() in negative_emotions
+    ]
 
     # Track music styles by response
     positive_music = {}
@@ -218,10 +248,18 @@ def _analyze_music_responses(responses: List[Dict[str, Any]]) -> str:
         if style:
             negative_music[style] = negative_music.get(style, 0) + 1
 
+    positive_pct = len(positive_responses) * 100 // len(responses) if responses else 0
+    best_styles = sorted(
+        positive_music.keys(), key=lambda x: positive_music[x], reverse=True
+    )[:3]
+    caution_styles = sorted(
+        negative_music.keys(), key=lambda x: negative_music[x], reverse=True
+    )[:2]
+
     summary = f"""- Total music responses recorded: {len(responses)}
-- Positive responses: {len(positive_responses)} ({len(positive_responses)*100//len(responses) if responses else 0}%)
-- Music styles with best responses: {', '.join([f"{k}" for k in sorted(positive_music.keys(), key=lambda x: positive_music[x], reverse=True)[:3]])}
-- Music styles to use cautiously: {', '.join([f"{k}" for k in sorted(negative_music.keys(), key=lambda x: negative_music[x], reverse=True)[:2]])}"""
+- Positive responses: {len(positive_responses)} ({positive_pct}%)
+- Music styles with best responses: {', '.join(best_styles)}
+- Music styles to use cautiously: {', '.join(caution_styles)}"""
 
     return summary
 

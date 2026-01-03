@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Music, Clock, TrendingUp, Key, Palette, Layers, Play, Download, Pause, Trash2, Edit2 } from 'lucide-react';
+import { X, Sparkles, Music, Clock, TrendingUp, Key, Palette, Layers, Play, Download, Pause, Trash2, Edit2, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import type { MusicStyle } from '@/app/types';
+import { useMusicGeneration } from '../contexts/MusicGenerationContext';
 
 interface AIMusicGenerationModalProps {
   isOpen: boolean;
@@ -20,8 +21,10 @@ export default function AIMusicGenerationModal({
   childId,
   onMusicGenerated
 }: AIMusicGenerationModalProps) {
+  const { startGeneration, tasks, isGenerating: globalGenerating } = useMusicGeneration();
   const [generating, setGenerating] = useState(false);
   const [generatedMusic, setGeneratedMusic] = useState<any | null>(null);
+  const [asyncMode, setAsyncMode] = useState(true); // Default to async mode
 
   // Generation method
   const [generationMethod, setGenerationMethod] = useState<'musicgen' | 'gpt-midi' | 'simple'>('musicgen');
@@ -63,9 +66,18 @@ export default function AIMusicGenerationModal({
     }
   }, [isOpen, audioElement]);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
+  // Watch for completed tasks and update generatedMusic
+  useEffect(() => {
+    const completedTask = tasks.find(t => t.status === 'completed' && t.result && !generatedMusic);
+    if (completedTask && completedTask.result) {
+      setGeneratedMusic(completedTask.result);
+      if (onMusicGenerated) {
+        onMusicGenerated(completedTask.result.path, completedTask.result);
+      }
+    }
+  }, [tasks, generatedMusic, onMusicGenerated]);
 
+  const handleGenerate = async () => {
     // Map generation method to backend parameters
     const getGenerationParams = () => {
       switch(generationMethod) {
@@ -78,17 +90,31 @@ export default function AIMusicGenerationModal({
       }
     };
 
+    const params = {
+      style,
+      duration,
+      tempo,
+      key: musicalKey,
+      ...getGenerationParams(),
+      child_id: (usePersonalization && childId) ? childId : undefined,
+      mood,
+      complexity
+    };
+
+    // Async mode - start generation in background and close modal
+    if (asyncMode && generationMethod === 'musicgen') {
+      const taskId = await startGeneration(params);
+      if (taskId) {
+        onClose(); // Close modal - user can continue using app
+      }
+      return;
+    }
+
+    // Sync mode - wait for generation to complete
+    setGenerating(true);
+
     try {
-      const response = await axios.post('http://localhost:8000/music/generate', {
-        style,
-        duration,
-        tempo,
-        key: musicalKey,
-        ...getGenerationParams(),
-        child_id: (usePersonalization && childId) ? childId : undefined,
-        mood,
-        complexity
-      });
+      const response = await axios.post('http://localhost:8000/music/generate', params);
 
       setGeneratedMusic(response.data);
       toast.success('AI music generated successfully!');
@@ -212,6 +238,65 @@ export default function AIMusicGenerationModal({
                   {generationMethod === 'simple' && '⚡ Quick sine wave generation for testing'}
                 </p>
               </div>
+
+              {/* Background Generation Toggle - Only for MusicGen */}
+              {generationMethod === 'musicgen' && (
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border-2 border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <label className="block text-sm font-semibold text-green-900 dark:text-green-100 mb-1 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4" />
+                        Background Generation
+                      </label>
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        {asyncMode
+                          ? '🚀 Generate in background - close modal and continue using the app'
+                          : '⏳ Wait for generation to complete before closing'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setAsyncMode(!asyncMode)}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                        asyncMode ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                      role="switch"
+                      aria-checked={asyncMode}
+                    >
+                      <span
+                        className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform ${
+                          asyncMode ? 'translate-x-7' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Active Generation Tasks */}
+              {tasks.filter(t => t.status === 'pending' || t.status === 'running').length > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20 p-4 rounded-xl border-2 border-amber-200 dark:border-amber-800">
+                  <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2 flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating in Background...
+                  </h4>
+                  {tasks.filter(t => t.status === 'pending' || t.status === 'running').map(task => (
+                    <div key={task.id} className="flex items-center gap-3 text-sm">
+                      <div className="flex-1">
+                        <p className="text-amber-800 dark:text-amber-200 capitalize">
+                          {task.params.style} - {task.params.duration}s
+                        </p>
+                        <div className="mt-1 h-2 bg-amber-200 dark:bg-amber-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-amber-500 transition-all duration-300"
+                            style={{ width: `${task.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs text-amber-600 dark:text-amber-400">{task.progress}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Child Personalization Toggle */}
               {childId && (
@@ -504,6 +589,11 @@ export default function AIMusicGenerationModal({
                     <>
                       <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       Generating Music...
+                    </>
+                  ) : asyncMode && generationMethod === 'musicgen' ? (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      Start Generation & Close
                     </>
                   ) : (
                     <>

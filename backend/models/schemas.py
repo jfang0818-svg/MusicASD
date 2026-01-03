@@ -1,10 +1,11 @@
 """
 Pydantic Models for API Request/Response Validation
 """
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, validator
 
 # ===================== ENUMS =====================
 
@@ -16,14 +17,22 @@ class EngagementLevel(str, Enum):
 
 class MusicStyle(str, Enum):
     """ASD-specific therapeutic music categories"""
-    CALMING_REGULATION = "calming_regulation"      # Meltdown prevention, self-regulation, transitions
-    FOCUS_ATTENTION = "focus_attention"            # Task engagement, concentration
-    SOCIAL_INTERACTIVE = "social_interactive"      # Turn-taking, joint attention, social skills
-    MOVEMENT_MOTOR = "movement_motor"              # Physical activity, gross motor skills
-    SENSORY_SEEKING = "sensory_seeking"            # For hypo-sensitive individuals needing stimulation
-    SENSORY_SOOTHING = "sensory_soothing"          # For hyper-sensitive individuals needing gentle input
-    SLEEP_REST = "sleep_rest"                      # Bedtime routines, relaxation
-    TRANSITION = "transition"                      # Activity changes, preparing for new activities
+    # Meltdown prevention, self-regulation, transitions
+    CALMING_REGULATION = "calming_regulation"
+    # Task engagement, concentration
+    FOCUS_ATTENTION = "focus_attention"
+    # Turn-taking, joint attention, social skills
+    SOCIAL_INTERACTIVE = "social_interactive"
+    # Physical activity, gross motor skills
+    MOVEMENT_MOTOR = "movement_motor"
+    # For hypo-sensitive individuals needing stimulation
+    SENSORY_SEEKING = "sensory_seeking"
+    # For hyper-sensitive individuals needing gentle input
+    SENSORY_SOOTHING = "sensory_soothing"
+    # Bedtime routines, relaxation
+    SLEEP_REST = "sleep_rest"
+    # Activity changes, preparing for new activities
+    TRANSITION = "transition"
 
 class AudioMode(str, Enum):
     """Audio playback modes"""

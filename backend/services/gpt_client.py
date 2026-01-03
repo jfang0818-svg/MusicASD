@@ -67,7 +67,7 @@ Please analyze this situation and provide your therapeutic recommendation follow
 
             # Call OpenAI API with GPT-5.1
             response = await self.client.chat.completions.create(
-                model="gpt-5.1",  # Using GPT-5.1 (Nov 2025)
+                model="gpt-4o",  # Using GPT-5.1 (Nov 2025)
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_message}
@@ -172,7 +172,7 @@ Guidelines:
 
             # Call GPT-5.1
             response = await self.client.chat.completions.create(
-                model="gpt-5.1",  # Using GPT-5.1 for advanced reasoning
+                model="gpt-4o",  # Using GPT-5.1 for advanced reasoning
                 messages=[
                     {"role": "system", "content": music_analysis_prompt},
                     {"role": "user", "content": profile_summary}
@@ -357,7 +357,7 @@ Key principles:
 
             # Call GPT-4/5
             response = await self.client.chat.completions.create(
-                model="gpt-4",  # Use gpt-4 for cost-effectiveness, can upgrade to gpt-5.1 later
+                model="gpt-4o",  # Use gpt-4 for cost-effectiveness, can upgrade to gpt-5.1 later
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": context}
@@ -562,7 +562,7 @@ Provide specific, actionable parameters for music generation."""
         """
         try:
             response = await self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[
                     {"role": "user", "content": prompt}
                 ],

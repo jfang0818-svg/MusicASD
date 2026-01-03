@@ -2,10 +2,11 @@
 Authentication API Endpoints
 Handles user registration, login, and profile management
 """
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-import uuid
+
 from models.schemas import (
     UserRegister,
     UserLogin,
@@ -22,6 +23,18 @@ from services.azure_storage import azure_storage
 from services.email_service import email_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """
+    Dependency to get current authenticated user.
+    Returns user dict with id, email, name etc.
+    """
+    user_id = auth_service.get_current_user_id(credentials)
+    user = await azure_storage.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 def get_limiter(request: Request):
@@ -110,15 +123,11 @@ async def login_user(login_data: UserLogin):
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_current_user_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     Get current user profile (requires authentication)
     """
-    user_id = auth_service.get_current_user_id(credentials)
-
-    user = await azure_storage.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    user = await get_current_user(credentials)
 
     return UserResponse(
         id=user["id"],
@@ -127,8 +136,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         phone=user.get("phone"),
         is_caregiver=user.get("is_caregiver", False),
         subscription_status=user.get("subscription_status", "trial"),
-        trial_start_date=datetime.fromisoformat(user["trial_start_date"]) if user.get("trial_start_date") else None,
-        trial_end_date=datetime.fromisoformat(user["trial_end_date"]) if user.get("trial_end_date") else None,
+        trial_start_date=datetime.fromisoformat(user["trial_start_date"])
+            if user.get("trial_start_date") else None,
+        trial_end_date=datetime.fromisoformat(user["trial_end_date"])
+            if user.get("trial_end_date") else None,
         created_at=datetime.fromisoformat(user["created_at"]),
         updated_at=datetime.fromisoformat(user["updated_at"])
     )

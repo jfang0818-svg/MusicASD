@@ -122,3 +122,7 @@ zparked/
 debug_steps.txt
 devmaterials/
 .claude/
+
+/*.md
+/*.docx
+/*.pdf

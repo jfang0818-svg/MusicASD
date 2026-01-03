@@ -28,12 +28,28 @@ async def create_planned_session(
 
     # Verify child profile exists and belongs to user
     try:
+        logger.info(
+            "Looking up child profile: user_id=%s, child_id=%s",
+            user_id, session_data.childId
+        )
         profile = await azure_storage.get_child_profile(user_id, session_data.childId)
         if not profile:
-            raise HTTPException(status_code=404, detail="Child profile not found")
+            logger.error(
+                "Child profile not found: user_id=%s, child_id=%s",
+                user_id, session_data.childId
+            )
+            raise HTTPException(
+                status_code=404,
+                detail=f"Child profile not found for child_id={session_data.childId}"
+            )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error verifying child profile: {e}")
-        raise HTTPException(status_code=404, detail="Child profile not found")
+        logger.error("Error verifying child profile: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error verifying child profile: {str(e)}"
+        ) from e
 
     # Create planned session document
     session_id = f"planned_session_{uuid.uuid4().hex[:12]}"
@@ -59,27 +75,30 @@ async def create_planned_session(
     }
 
     try:
-        await azure_storage.save_planned_session(user_id, session_id, planned_session)
+        result = await azure_storage.save_planned_session(user_id, session_id, planned_session)
+        logger.info("POST /planned-sessions - saved=%s, user_id=%s, session_id=%s", result, user_id, session_id)
         return PlannedSessionResponse(**planned_session)
     except Exception as e:
-        logger.error(f"Error creating planned session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create planned session")
+        logger.error("Error creating planned session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to create planned session") from e
 
 
 @router.get("", response_model=List[PlannedSessionResponse])
 async def get_planned_sessions(
-    childId: Optional[str] = Query(None),
+    child_id: Optional[str] = Query(None, alias="childId"),
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
     """Get all planned sessions, optionally filtered by child (requires authentication)"""
     user_id = auth_service.get_current_user_id(credentials)
+    logger.info("GET /planned-sessions - user_id=%s, child_id=%s", user_id, child_id)
 
     try:
-        sessions = await azure_storage.get_planned_sessions(user_id, childId)
+        sessions = await azure_storage.get_planned_sessions(user_id, child_id)
+        logger.info("Found %d planned sessions for user %s", len(sessions), user_id)
         return [PlannedSessionResponse(**session) for session in sessions]
     except Exception as e:
-        logger.error(f"Error fetching planned sessions: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch planned sessions")
+        logger.error("Error fetching planned sessions: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch planned sessions") from e
 
 
 @router.get("/upcoming/{child_id}", response_model=List[PlannedSessionResponse])
@@ -96,15 +115,15 @@ async def get_upcoming_planned_sessions(
         if not profile:
             raise HTTPException(status_code=404, detail="Child profile not found")
     except Exception as e:
-        logger.error(f"Error verifying child profile: {e}")
-        raise HTTPException(status_code=404, detail="Child profile not found")
+        logger.error("Error verifying child profile: %s", e)
+        raise HTTPException(status_code=404, detail="Child profile not found") from e
 
     try:
         sessions = await azure_storage.get_upcoming_planned_sessions(user_id, child_id)
         return [PlannedSessionResponse(**session) for session in sessions]
     except Exception as e:
-        logger.error(f"Error fetching upcoming planned sessions: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch upcoming planned sessions")
+        logger.error("Error fetching upcoming planned sessions: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch upcoming planned sessions") from e
 
 
 @router.get("/{session_id}", response_model=PlannedSessionResponse)
@@ -123,8 +142,8 @@ async def get_planned_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching planned session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch planned session")
+        logger.error("Error fetching planned session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch planned session") from e
 
 
 @router.put("/{session_id}", response_model=PlannedSessionResponse)
@@ -144,8 +163,8 @@ async def update_planned_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching existing session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch planned session")
+        logger.error("Error fetching existing session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to fetch planned session") from e
 
     # Update only provided fields
     update_data = session_data.model_dump(exclude_unset=True)
@@ -156,8 +175,8 @@ async def update_planned_session(
         await azure_storage.save_planned_session(user_id, session_id, updated_session)
         return PlannedSessionResponse(**updated_session)
     except Exception as e:
-        logger.error(f"Error updating planned session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to update planned session")
+        logger.error("Error updating planned session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to update planned session") from e
 
 
 @router.delete("/{session_id}")
@@ -176,12 +195,12 @@ async def delete_planned_session(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error verifying planned session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to verify planned session")
+        logger.error("Error verifying planned session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to verify planned session") from e
 
     try:
         await azure_storage.delete_planned_session(user_id, session_id)
         return {"message": "Planned session deleted successfully"}
     except Exception as e:
-        logger.error(f"Error deleting planned session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete planned session")
+        logger.error("Error deleting planned session: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to delete planned session") from e

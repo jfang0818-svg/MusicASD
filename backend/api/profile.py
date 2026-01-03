@@ -2,11 +2,14 @@
 Child Profile API Endpoints
 Handles CRUD operations for child profiles
 """
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from fastapi.security import HTTPAuthorizationCredentials
+import logging
+import uuid
 from datetime import datetime
 from typing import List
-import uuid
+
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi.security import HTTPAuthorizationCredentials
+
 from models.schemas import (
     ChildProfileCreate,
     ChildProfileUpdate,
@@ -19,6 +22,8 @@ from models.schemas import (
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
 from services.gpt_client import GPTClient
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/profile", tags=["Child Profiles"])
 
@@ -39,11 +44,24 @@ async def create_child_profile(
         "id": child_id,
         "user_id": user_id,
         "demographics": profile_data.demographics.dict(),
-        "sensory_sensitivities": profile_data.sensory_sensitivities.dict() if profile_data.sensory_sensitivities else None,
-        "communication": profile_data.communication.dict() if profile_data.communication else None,
-        "behavioral_patterns": profile_data.behavioral_patterns.dict() if profile_data.behavioral_patterns else None,
-        "music_preferences": profile_data.music_preferences.dict() if profile_data.music_preferences else None,
-        "therapy_goals": profile_data.therapy_goals.dict() if profile_data.therapy_goals else None,
+        "sensory_sensitivities": (
+            profile_data.sensory_sensitivities.dict()
+            if profile_data.sensory_sensitivities else None
+        ),
+        "communication": (
+            profile_data.communication.dict() if profile_data.communication else None
+        ),
+        "behavioral_patterns": (
+            profile_data.behavioral_patterns.dict()
+            if profile_data.behavioral_patterns else None
+        ),
+        "music_preferences": (
+            profile_data.music_preferences.dict()
+            if profile_data.music_preferences else None
+        ),
+        "therapy_goals": (
+            profile_data.therapy_goals.dict() if profile_data.therapy_goals else None
+        ),
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat()
     }
@@ -204,10 +222,10 @@ async def analyze_child_profile(
         raise HTTPException(
             status_code=503,
             detail="Music analysis service not configured. Please contact administrator."
-        )
+        ) from e
     except Exception as e:
-        print(f"Error analyzing profile: {e}")
-        raise HTTPException(status_code=500, detail="Failed to analyze profile")
+        logger.error("Error analyzing profile: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to analyze profile") from e
 
 
 @router.get("/child/{child_id}/music-elements", response_model=MusicElementsResponse)
@@ -240,7 +258,9 @@ async def get_music_elements(
     return MusicElementsResponse(
         child_id=child_id,
         elements=elements,
-        analyzed_at=datetime.fromisoformat(elements.get("analyzed_at", datetime.utcnow().isoformat()))
+        analyzed_at=datetime.fromisoformat(
+            elements.get("analyzed_at", datetime.utcnow().isoformat())
+        )
     )
 
 
@@ -292,8 +312,8 @@ async def upload_document(
         return DocumentUploadResponse(**doc_metadata)
 
     except Exception as e:
-        print(f"Error uploading document: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload document")
+        logger.error("Error uploading document: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to upload document") from e
 
 
 @router.get("/child/{child_id}/documents", response_model=List[ProfileDocument])
@@ -360,7 +380,7 @@ async def delete_document(
         )
 
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        print(f"Error deleting document: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete document")
+        logger.error("Error deleting document: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to delete document") from e

@@ -1,25 +1,19 @@
 """
 Music Response Metrics API endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import HTTPAuthorizationCredentials
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
 import logging
 import uuid
+from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.auth import get_current_user
 from models.schemas import (
+    MusicResponseAggregateMetrics,
     MusicResponseMetricsCreate,
     MusicResponseMetricsResponse,
-    MusicResponseAggregateMetrics,
-    MusicResponseTrends,
-    SuccessResponse,
-    TaskPersistence,
-    RhythmicSync,
-    EmotionResponse,
-    EngagementDeviance
 )
-from services.auth import auth_service, security
 from services.azure_storage import azure_storage
 
 logger = logging.getLogger(__name__)
@@ -29,7 +23,7 @@ router = APIRouter(prefix="/music-response", tags=["music-response"])
 @router.post("/assess", response_model=MusicResponseMetricsResponse)
 async def create_music_response_assessment(
     data: MusicResponseMetricsCreate,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Create a music response assessment after music playback.
@@ -38,17 +32,20 @@ async def create_music_response_assessment(
     responded to a specific piece of music during a session.
     """
     try:
-        # Verify user token
-        user = await auth_service.verify_token(credentials.credentials)
-
         # Verify child belongs to user
-        child_profile = await azure_storage.load_json(f"profiles/{user['id']}/{data.child_id}/profile.json")
+        profile_path = f"profiles/{current_user['id']}/{data.child_id}/profile.json"
+        child_profile = await azure_storage.load_json(profile_path)
         if not child_profile:
-            raise HTTPException(status_code=404, detail="Child profile not found or access denied")
+            raise HTTPException(
+                status_code=404,
+                detail="Child profile not found or access denied"
+            )
 
         # Generate unique response ID
-        response_id = f"response_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         timestamp = datetime.now()
+        response_id = (
+            f"response_{timestamp.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+        )
 
         # Create response document
         response_data = {
@@ -77,7 +74,7 @@ async def create_music_response_assessment(
             "observer_notes": data.observer_notes,
 
             # Metadata
-            "created_by": user['id'],
+            "created_by": current_user['id'],
             "created_at": timestamp.isoformat()
         }
 
@@ -85,7 +82,11 @@ async def create_music_response_assessment(
         blob_path = f"music_responses/{data.child_id}/{data.session_id}/{response_id}.json"
         await azure_storage.save_json(blob_path, response_data)
 
-        logger.info(f"Music response assessment created: {response_id} for child {data.child_id}")
+        logger.info(
+            "Music response assessment created: %s for child %s",
+            response_id,
+            data.child_id
+        )
 
         return MusicResponseMetricsResponse(
             response_id=response_id,
@@ -110,31 +111,35 @@ async def create_music_response_assessment(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error creating music response assessment: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error creating music response assessment: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/child/{child_id}/session/{session_id}", response_model=List[MusicResponseMetricsResponse])
+@router.get(
+    "/child/{child_id}/session/{session_id}",
+    response_model=List[MusicResponseMetricsResponse]
+)
 async def get_session_assessments(
     child_id: str,
     session_id: str,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get all music response assessments for a specific session.
     """
     try:
-        # Verify user token
-        user = await auth_service.verify_token(credentials.credentials)
-
         # Verify child belongs to user
-        child_profile = await azure_storage.load_json(f"profiles/{user['id']}/{child_id}/profile.json")
+        profile_path = f"profiles/{current_user['id']}/{child_id}/profile.json"
+        child_profile = await azure_storage.load_json(profile_path)
         if not child_profile:
-            raise HTTPException(status_code=404, detail="Child profile not found or access denied")
+            raise HTTPException(
+                status_code=404,
+                detail="Child profile not found or access denied"
+            )
 
         # List all assessments for this session
         prefix = f"music_responses/{child_id}/{session_id}/"
-        blob_names = await azure_storage.list_blobs(prefix)
+        blob_names = await azure_storage.list_blobs_in_path(prefix)
 
         assessments = []
         for blob_name in blob_names:
@@ -165,15 +170,18 @@ async def get_session_assessments(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving session assessments: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error retrieving session assessments: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@router.get("/child/{child_id}/aggregate", response_model=MusicResponseAggregateMetrics)
+@router.get(
+    "/child/{child_id}/aggregate",
+    response_model=MusicResponseAggregateMetrics
+)
 async def get_aggregate_metrics(
     child_id: str,
     days: int = 30,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Get aggregated music response metrics for a child over a time period.
@@ -181,17 +189,18 @@ async def get_aggregate_metrics(
     Computes statistics and quality scores from all assessments.
     """
     try:
-        # Verify user token
-        user = await auth_service.verify_token(credentials.credentials)
-
         # Verify child belongs to user
-        child_profile = await azure_storage.load_json(f"profiles/{user['id']}/{child_id}/profile.json")
+        profile_path = f"profiles/{current_user['id']}/{child_id}/profile.json"
+        child_profile = await azure_storage.load_json(profile_path)
         if not child_profile:
-            raise HTTPException(status_code=404, detail="Child profile not found or access denied")
+            raise HTTPException(
+                status_code=404,
+                detail="Child profile not found or access denied"
+            )
 
         # Get all assessments for this child
         prefix = f"music_responses/{child_id}/"
-        blob_names = await azure_storage.list_blobs(prefix)
+        blob_names = await azure_storage.list_blobs_in_path(prefix)
 
         # Filter by date range
         cutoff_date = datetime.now() - timedelta(days=days)
@@ -229,32 +238,66 @@ async def get_aggregate_metrics(
 
         # Calculate binary metrics percentages
         total = len(assessments)
-        initiation_count = sum(1 for a in assessments if a.get("initiation") is True)
-        response_count = sum(1 for a in assessments if a.get("response_to_prompt") is True)
-        communication_count = sum(1 for a in assessments if a.get("communication") is True)
-        motor_count = sum(1 for a in assessments if a.get("motor_movement") is True)
-        aversion_count = sum(1 for a in assessments if a.get("aversion") is True)
+        initiation_count = sum(
+            1 for a in assessments if a.get("initiation") is True
+        )
+        response_count = sum(
+            1 for a in assessments if a.get("response_to_prompt") is True
+        )
+        communication_count = sum(
+            1 for a in assessments if a.get("communication") is True
+        )
+        motor_count = sum(
+            1 for a in assessments if a.get("motor_movement") is True
+        )
+        aversion_count = sum(
+            1 for a in assessments if a.get("aversion") is True
+        )
 
         # Calculate categorical metrics averages (normalized 0-1)
-        persistence_map = {"none": 0, "partial": 0.33, "majority": 0.67, "full": 1.0}
+        persistence_map = {
+            "none": 0, "partial": 0.33, "majority": 0.67, "full": 1.0
+        }
         sync_map = {"none": 0, "brief": 0.5, "continuous": 1.0}
         emotion_map = {"disengaged": 0, "neutral": 0.5, "positive": 1.0}
-        deviance_map = {"significantly_less": 0, "somewhat_less": 0.25, "typical": 0.5,
-                       "somewhat_greater": 0.75, "significantly_greater": 1.0}
+        deviance_map = {
+            "significantly_less": 0,
+            "somewhat_less": 0.25,
+            "typical": 0.5,
+            "somewhat_greater": 0.75,
+            "significantly_greater": 1.0
+        }
 
-        persistence_scores = [persistence_map.get(a.get("task_persistence"), 0.5)
-                             for a in assessments if a.get("task_persistence")]
-        sync_scores = [sync_map.get(a.get("rhythmic_sync"), 0)
-                      for a in assessments if a.get("rhythmic_sync")]
-        emotion_scores = [emotion_map.get(a.get("emotion"), 0.5)
-                         for a in assessments if a.get("emotion")]
-        deviance_scores = [deviance_map.get(a.get("deviance_from_typical"), 0.5)
-                          for a in assessments if a.get("deviance_from_typical")]
+        persistence_scores = [
+            persistence_map.get(a.get("task_persistence"), 0.5)
+            for a in assessments if a.get("task_persistence")
+        ]
+        sync_scores = [
+            sync_map.get(a.get("rhythmic_sync"), 0)
+            for a in assessments if a.get("rhythmic_sync")
+        ]
+        emotion_scores = [
+            emotion_map.get(a.get("emotion"), 0.5)
+            for a in assessments if a.get("emotion")
+        ]
+        deviance_scores = [
+            deviance_map.get(a.get("deviance_from_typical"), 0.5)
+            for a in assessments if a.get("deviance_from_typical")
+        ]
 
-        avg_persistence = sum(persistence_scores) / len(persistence_scores) if persistence_scores else 0.5
+        if persistence_scores:
+            avg_persistence = sum(persistence_scores) / len(persistence_scores)
+        else:
+            avg_persistence = 0.5
         avg_sync = sum(sync_scores) / len(sync_scores) if sync_scores else 0.0
-        avg_emotion = sum(emotion_scores) / len(emotion_scores) if emotion_scores else 0.5
-        avg_deviance = sum(deviance_scores) / len(deviance_scores) if deviance_scores else 0.5
+        if emotion_scores:
+            avg_emotion = sum(emotion_scores) / len(emotion_scores)
+        else:
+            avg_emotion = 0.5
+        if deviance_scores:
+            avg_deviance = sum(deviance_scores) / len(deviance_scores)
+        else:
+            avg_deviance = 0.5
 
         # Calculate overall quality score (0-100)
         quality_score = (
@@ -271,15 +314,29 @@ async def get_aggregate_metrics(
         # Metrics by style
         metrics_by_style = {}
         for style in ["calm", "happy", "energetic"]:
-            style_assessments = [a for a in assessments if a.get("music_style") == style]
+            style_assessments = [
+                a for a in assessments if a.get("music_style") == style
+            ]
             if style_assessments:
                 style_total = len(style_assessments)
+                init_rate = sum(
+                    1 for a in style_assessments if a.get("initiation") is True
+                ) / style_total
+                comm_rate = sum(
+                    1 for a in style_assessments
+                    if a.get("communication") is True
+                ) / style_total
+                avers_rate = sum(
+                    1 for a in style_assessments if a.get("aversion") is True
+                ) / style_total
                 metrics_by_style[style] = {
                     "count": style_total,
-                    "quality_score": calculate_quality_score_for_assessments(style_assessments),
-                    "initiation_rate": sum(1 for a in style_assessments if a.get("initiation") is True) / style_total,
-                    "communication_rate": sum(1 for a in style_assessments if a.get("communication") is True) / style_total,
-                    "aversion_rate": sum(1 for a in style_assessments if a.get("aversion") is True) / style_total
+                    "quality_score": calculate_quality_score_for_assessments(
+                        style_assessments
+                    ),
+                    "initiation_rate": init_rate,
+                    "communication_rate": comm_rate,
+                    "aversion_rate": avers_rate
                 }
 
         # Top performing tracks
@@ -301,7 +358,9 @@ async def get_aggregate_metrics(
             })
 
         # Sort by quality score and take top 10
-        top_tracks = sorted(top_tracks, key=lambda x: x["quality_score"], reverse=True)[:10]
+        top_tracks = sorted(
+            top_tracks, key=lambda x: x["quality_score"], reverse=True
+        )[:10]
 
         return MusicResponseAggregateMetrics(
             child_id=child_id,
@@ -327,11 +386,13 @@ async def get_aggregate_metrics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error calculating aggregate metrics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error calculating aggregate metrics: %s", e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-def calculate_quality_score_for_assessments(assessments: List[Dict[str, Any]]) -> float:
+def calculate_quality_score_for_assessments(
+    assessments: List[Dict[str, Any]]
+) -> float:
     """Helper function to calculate quality score for a list of assessments"""
     if not assessments:
         return 0.0
@@ -339,25 +400,46 @@ def calculate_quality_score_for_assessments(assessments: List[Dict[str, Any]]) -
     total = len(assessments)
 
     # Binary metrics
-    initiation_count = sum(1 for a in assessments if a.get("initiation") is True)
-    response_count = sum(1 for a in assessments if a.get("response_to_prompt") is True)
-    communication_count = sum(1 for a in assessments if a.get("communication") is True)
-    motor_count = sum(1 for a in assessments if a.get("motor_movement") is True)
-    aversion_count = sum(1 for a in assessments if a.get("aversion") is True)
+    initiation_count = sum(
+        1 for a in assessments if a.get("initiation") is True
+    )
+    response_count = sum(
+        1 for a in assessments if a.get("response_to_prompt") is True
+    )
+    communication_count = sum(
+        1 for a in assessments if a.get("communication") is True
+    )
+    motor_count = sum(
+        1 for a in assessments if a.get("motor_movement") is True
+    )
+    aversion_count = sum(
+        1 for a in assessments if a.get("aversion") is True
+    )
 
     # Categorical metrics
-    persistence_map = {"none": 0, "partial": 0.33, "majority": 0.67, "full": 1.0}
+    persistence_map = {
+        "none": 0, "partial": 0.33, "majority": 0.67, "full": 1.0
+    }
     sync_map = {"none": 0, "brief": 0.5, "continuous": 1.0}
     emotion_map = {"disengaged": 0, "neutral": 0.5, "positive": 1.0}
 
-    persistence_scores = [persistence_map.get(a.get("task_persistence"), 0.5)
-                         for a in assessments if a.get("task_persistence")]
-    sync_scores = [sync_map.get(a.get("rhythmic_sync"), 0)
-                  for a in assessments if a.get("rhythmic_sync")]
-    emotion_scores = [emotion_map.get(a.get("emotion"), 0.5)
-                     for a in assessments if a.get("emotion")]
+    persistence_scores = [
+        persistence_map.get(a.get("task_persistence"), 0.5)
+        for a in assessments if a.get("task_persistence")
+    ]
+    sync_scores = [
+        sync_map.get(a.get("rhythmic_sync"), 0)
+        for a in assessments if a.get("rhythmic_sync")
+    ]
+    emotion_scores = [
+        emotion_map.get(a.get("emotion"), 0.5)
+        for a in assessments if a.get("emotion")
+    ]
 
-    avg_persistence = sum(persistence_scores) / len(persistence_scores) if persistence_scores else 0.5
+    if persistence_scores:
+        avg_persistence = sum(persistence_scores) / len(persistence_scores)
+    else:
+        avg_persistence = 0.5
     avg_sync = sum(sync_scores) / len(sync_scores) if sync_scores else 0.0
     avg_emotion = sum(emotion_scores) / len(emotion_scores) if emotion_scores else 0.5
 

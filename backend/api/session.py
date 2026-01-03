@@ -246,7 +246,7 @@ async def get_session_logs(
 
     try:
         # Get session data from Azure Blob Storage
-        session_data = await azure_storage.get_session(session_id)
+        session_data = await azure_storage.find_session_by_id(session_id)
 
         if not session_data:
             raise HTTPException(status_code=404, detail="Session not found")

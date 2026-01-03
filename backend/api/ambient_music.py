@@ -2,12 +2,13 @@
 Ambient Generative Music API endpoints
 Real-time soundscape generation for calming and regulation
 """
-from fastapi import APIRouter, HTTPException, Depends, Body
-from fastapi.security import HTTPAuthorizationCredentials
-from datetime import datetime
-from typing import Optional, List, Dict, Any
 import logging
 import uuid
+from datetime import datetime
+from typing import Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from services.auth import auth_service, security
 from services.azure_storage import azure_storage
@@ -134,7 +135,7 @@ async def start_ambient_music(
     blob_path = f"ambient_sessions/{child_id}/{ambient_id}.json"
     await azure_storage.save_json(blob_path, ambient_session)
 
-    logger.info(f"Started ambient music {ambient_id} for child {child_id}")
+    logger.info("Started ambient music %s for child %s", ambient_id, child_id)
 
     return {
         "status": "started",
@@ -177,7 +178,7 @@ async def update_ambient_parameters(
     # Save back
     await azure_storage.save_json(blob_path, ambient_session)
 
-    logger.info(f"Updated parameters for ambient {ambient_id}")
+    logger.info("Updated parameters for ambient %s", ambient_id)
 
     return {
         "status": "updated",
@@ -229,7 +230,7 @@ async def stop_ambient_music(
     # Save back
     await azure_storage.save_json(blob_path, ambient_session)
 
-    logger.info(f"Stopped ambient music {ambient_id}")
+    logger.info("Stopped ambient music %s", ambient_id)
 
     return {
         "status": "stopped",
@@ -259,7 +260,7 @@ async def get_ambient_history(
 
     # List all sessions
     prefix = f"ambient_sessions/{child_id}/"
-    blob_names = await azure_storage.list_blobs(prefix)
+    blob_names = await azure_storage.list_blobs_in_path(prefix)
 
     sessions = []
     for blob_name in blob_names[:limit]:
@@ -272,8 +273,17 @@ async def get_ambient_history(
 
     # Calculate statistics
     completed = [s for s in sessions if s.get("status") == "completed"]
-    avg_effectiveness = sum(s.get("effectiveness", 0) for s in completed) / len(completed) if completed else 0
-    most_used = max(set(s.get("environment") for s in sessions), key=lambda x: sum(1 for s in sessions if s.get("environment") == x)) if sessions else None
+    avg_effectiveness = (
+        sum(s.get("effectiveness", 0) for s in completed) / len(completed)
+        if completed else 0
+    )
+    most_used = (
+        max(
+            set(s.get("environment") for s in sessions),
+            key=lambda x: sum(1 for s in sessions if s.get("environment") == x)
+        )
+        if sessions else None
+    )
 
     return {
         "child_id": child_id,
@@ -327,7 +337,7 @@ async def save_custom_preset(
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save preset")
 
-    logger.info(f"Saved custom ambient preset for child {child_id}")
+    logger.info("Saved custom ambient preset for child %s", child_id)
 
     return {
         "status": "saved",

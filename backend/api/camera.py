@@ -1,10 +1,11 @@
 """
 Camera API endpoints
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from datetime import datetime
 import logging
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/camera", tags=["camera"])
@@ -36,7 +37,7 @@ def toggle_camera(toggle: CameraToggle):
         }
         state.logs.append(log_entry)
 
-    logger.info(f"Camera {'enabled' if toggle.enabled else 'disabled'}")
+    logger.info("Camera %s", "enabled" if toggle.enabled else "disabled")
 
     return {
         "status": "success",
