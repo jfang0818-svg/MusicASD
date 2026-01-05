@@ -120,7 +120,7 @@ export const SESSION_PHASES: PhaseDefinition[] = [
     color: 'green',
     durationMinutes: 2,
     description: 'Welcome and greeting routine',
-    caregiverPrompt: 'Greet your child by name. Make eye contact and sing along with the hello song.',
+    caregiverPrompt: 'Greet the person in your care by name. Make eye contact and sing along with the hello song.',
     musicStyle: 'social_interactive',
     autoPlayMusic: true,
     hasSubActivities: false,
